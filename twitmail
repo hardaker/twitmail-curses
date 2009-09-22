@@ -11,12 +11,12 @@ our $VERSION = "0.2";
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
 
-my %opts = (m => 'replies,friends',
+my %opts = (m => 'friends,replies',
 	    I => 4);
 
 GetOptions(\%opts,
 	   ["a|show-all", "Show all messages, not just recent"],
-	   ["m|modes=s",  "Comma separated modes to use: replies,friends"],
+	   ["m|modes=s",  "Comma separated modes to use: friends,replies"],
 	   ["u|update",   "Set your status from arguments"],
 	   ["r|reply=i",  "Reply to message number INTEGER with text from arguments"],
 	   ["f|follow=s", "Follow the user named STRING"],
@@ -290,7 +290,7 @@ Show updates from all the world.
 
 =back
 
-The default value is replies,friends
+The default value is friends,replies
 
 =item -u MESSAGE
 
