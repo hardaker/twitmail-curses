@@ -73,7 +73,7 @@ if ($opts{'c'}) {
 }
 
 if ($opts{'C'}) {
-    collect_tweets();
+    collect_tweets($twit);
     exit;
 }
 
@@ -149,7 +149,9 @@ sub print_each_result {
 }
 
 sub sprint_each_result {
-    my ($data, $mode, $setarg, $setfrom, $indent, $lastday, $lastuser) = @_;
+    my ($data, $mode, $setarg, $setfrom, $indent, $lastday, $lastuser, $nowrap)
+      = @_;
+    my @results;
 
     $indent ||= 0;
 
@@ -169,14 +171,17 @@ sub sprint_each_result {
 	$dat->{'created_at'} =~ s/^$lastday/   / if ($lastday);
 	$lastday = $thisday;
 
-	# print the results
-	print wrap(sprintf("%2.2d %-9.9s %-10.10s $intext", $msgnum,
+	# create the results
+	my $line = sprintf("%2.2d %-9.9s %-10.10s $intext", $msgnum,
 			   $dat->{'created_at'},
 			   ($lastuser eq $dat->{'user'}{'screen_name'})
-			   ? "" : $dat->{'user'}{'screen_name'}),
-		   sprintf("%2.2s %-9.9s %-10.10s $intext","", "",""),
-		   $dat->{'text'}),"\n";
+			   ? "" : $dat->{'user'}{'screen_name'});
+	$line = wrap($line, 
+		     sprintf("%2.2s %-9.9s %-10.10s $intext","", "",""),
+		     $dat->{'text'}) unless($nowrap);
+	$line .= "\n";
 	$lastuser = $dat->{'user'}{'screen_name'};
+	push @results, $line;
 
 	my $formattednum = sprintf("%02.2d", $msgnum);
 
@@ -186,8 +191,9 @@ sub sprint_each_result {
 	  $dat->{'user'}{'screen_name'} if (exists($dat->{'user'}));
 
 	if (exists($dat->{'replies'})) {
-	    print_each_result($dat->{'replies'}, $mode, $setarg, $setfrom,
-			      $indent+1, $lastday, $lastuser);
+	    push @results,
+	      print_each_result($dat->{'replies'}, $mode, $setarg, $setfrom,
+				$indent+1, $lastday, $lastuser, $nowrap);
 	}
 
     }
@@ -198,6 +204,7 @@ sub sprint_each_result {
     if (defined($mode) && defined($setarg)) {
 	$config{"${mode}_${setarg}"} = $data->[0]{$setfrom || $setarg};
     }
+    return @results;
 }
 
 sub read_config {
@@ -376,8 +383,8 @@ sub remember_tweets {
                                                    created_at, inreplytoid,
                                                    inreplytouserid,
                                                    inreplytousername,
-                                                   tweet)
-                                values(?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?)");
+                                                   tweet, twitmailstatus)
+                                values(?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?, ?)");
 	die "failed to create insert to tweets statement $! $@"
 	  if (!$instweeth);
     }
@@ -393,7 +400,8 @@ sub remember_tweets {
 			    $tweet->{'in_reply_to_status_id'},
 			    $tweet->{'in_reply_to_user_id'},
 			    $tweet->{'in_reply_to_screen_name'},
-			    $tweet->{'text'});
+			    $tweet->{'text'},
+			    'N');
     }
 }
 
@@ -410,11 +418,28 @@ sub get_tweets {
 }
 
 sub collect_tweets {
+    my $twit = shift;
     init_dbh();
     my $lastid = get_config('last_id');
 
-    my $friend_data = $twit->friends_timeline();
-    remember_tweets(@$friend_data);
+    print "collecting since $lastid\n";
+
+    my $friend_data = $twit->friends_timeline({since_id => $lastid});
+    my $reply_data = $twit->replies({since_id => $lastid});
+
+    my @alldata;
+    push @alldata, @$friend_data if (defined($friend_data));
+    push @alldata, @$reply_data if (defined($reply_data));
+
+    # don't assume perfectly sorted
+    foreach my $tweet (@alldata) {
+	$lastid = $tweet->{'id'} if ($tweet->{'id'} > $lastid);
+    }
+    set_config('last_id', $lastid);
+
+    print "collected: " . ($#alldata+1) . "; new lastid = $lastid\n";
+
+    remember_tweets(@alldata);
 
 #     $twit->replies(\%args), $mode, 'since_id', 'id');
 
@@ -431,11 +456,11 @@ sub get_config {
     my ($name) = @_;
     # check the DB version
     if (!$paramconfig) {
-	$paramconfig = $dbh->prepare_cached("select value from twitmail where name = '$name'");
+	$paramconfig = $dbh->prepare_cached("select value from twitmail where name = ?");
     }
     my $result = '';
     if ($paramconfig) {
-	$paramconfig->execute();
+	$paramconfig->execute($name);
 	$result = $paramconfig->fetchrow_arrayref();
 	$result = $result->[0] if (ref($result) eq 'ARRAY');
 	$paramconfig->finish(); # required to work around a bug.
