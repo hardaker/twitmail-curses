@@ -665,7 +665,7 @@ sub collect_tweets {
 
     my $friend_data = $twit->friends_timeline({since_id => $lastid});
     my $count = 1;
-    while ($count < 10 && get_max_id_from_array($friend_data) > $lastid) {
+    while ($count < 10 && get_min_id_from_array($friend_data) > $lastid) {
 	$count++;
 	my $new_friend_data = $twit->friends_timeline({since_id => $lastid,
 						       page => $count});
@@ -691,10 +691,18 @@ sub collect_tweets {
 }
 
 sub get_max_id_from_array {
-    my $maxid = -1;
+    my $maxid;
     my ($tweets) = @_;
     foreach my $tweet (@$tweets) {
-	$maxid = $tweet->{'id'} if ($maxid < $tweet->{'id'});
+	$maxid = $tweet->{'id'} if (!$maxid || $maxid < $tweet->{'id'});
+    }
+}
+
+sub get_min_id_from_array {
+    my ($tweets) = @_;
+    my $minid;
+    foreach my $tweet (@$tweets) {
+	$minid = $tweet->{'id'} if (!$minid || $minid > $tweet->{'id'});
     }
 }
 
