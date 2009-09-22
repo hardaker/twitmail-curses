@@ -13,7 +13,7 @@ use Date::Parse;
 
 our $VERSION = "0.3";
 our $dbh;
-our $DEBUG = 1;
+our $DEBUG = 0;
 
 my $DBVERSION = 1;
 
