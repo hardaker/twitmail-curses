@@ -24,11 +24,14 @@ my @preferences =
     undef,
     fetchunread => 'Tweets to show when nothing new',
     max_tweets   => 'Maximum number of new tweets to fetch',
+    undef,
+    do_debugging => 'Log debugging to ~/.twitmail.debug',
   );
 
 my %prefdefaults =
   (fetchunread => 100,
    max_tweets => 200,
+   do_debugging => 0,
   );
 
 my @helptexts =
@@ -957,6 +960,8 @@ sub init_twit {
     } else {
 	$twit = undef;
     }
+
+    $DEBUG = get_config('do_debugging');
 }
 
 
