@@ -1,5 +1,7 @@
 #!/bin/sh
 
+ver=`grep VERSION twitmail | head -1 | sed 's/";//;s/.*"//;'`
+
 if test ! -f Curses/UI/Language/english.pm ; then
     mkdir -p Curses/UI/Language
     cp -pr /usr/local/lib/perl5/site_perl/5.10.0/Curses/UI/Language/*.pm Curses/UI/Language/
@@ -45,4 +47,4 @@ pp -M Net::Twitter  -M Net::Twitter::Role::Legacy \
    -M Curses::UI::Dialog::Status \
    -M Curses::UI::Language::english \
    -a Curses/UI/Language/english.pm \
-   -o twitmail.`uname -s | tr A-Z a-z` twitmail
+   -o twitmail-$ver.`uname -s | tr A-Z a-z` twitmail
