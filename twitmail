@@ -161,9 +161,16 @@ sub sprint_each_result {
 
     $indent ||= 0;
 
-    my $intext = " " x ($indent * $opts{'I'});
+    my $intext;
+    if ($indent) {
+	$intext = " " . " " x (($indent-1) * $opts{'I'}) . "-" x $opts{'I'} ;
+	$intext =~ s/-/|/;
+	$intext =~ s/-$/ /;
+    } else {
+	$intext = " ";
+    }
 
-    foreach my $dat (reverse @$data) {
+    foreach my $dat (@$data) {
 
 	$msgnum++;
 
@@ -178,7 +185,7 @@ sub sprint_each_result {
 	$lastday = $thisday;
 
 	# create the results
-	my $line = sprintf("%-2.2s %-9.9s %-10.10s $intext%s", 
+	my $line = sprintf("%-2.2s %-9.9s %-10.10s  $intext%s", 
 			   ($includestatus ? $dat->{'twitmailstatus'} : $msgnum),
 			   $dat->{'created_at'},
 			   ($lastuser eq $dat->{'user'}{'screen_name'})
@@ -200,10 +207,11 @@ sub sprint_each_result {
 	  $dat->{'user'}{'screen_name'} if (exists($dat->{'user'}));
 
 	if (exists($dat->{'replies'})) {
-	    push @results,
-	      print_each_result($dat->{'replies'}, $mode, $setarg, $setfrom,
-				$indent+1, $lastday, $lastuser, $nowrap,
-				$ids);
+	    my @newlines = 
+	      sprint_each_result($dat->{'replies'}, $mode, $setarg, $setfrom,
+				 $indent+1, $lastday, $lastuser, $nowrap,
+				 $includestatus, $ids);
+	    push @results, @newlines;
 	}
 
     }
@@ -255,6 +263,7 @@ my $twitedit;
 
 my %msginfo;
 my %labels;
+my $cui;
 
 sub show_msg {
     my $num = $_[0]->get_active_value();
@@ -262,7 +271,7 @@ sub show_msg {
     $msginfo{'from'}->text($tweet->{'fromuser'});
     $msginfo{'fromname'}->text($tweet->{'fromname'});
     $msginfo{'date'}->text($tweet->{'created_at'});
-    $msginfo{'reply'}->text($tweet->{'inreplytousername'});
+    $msginfo{'reply'}->text($tweet->{'inreplytousername'} || "");
     $msginfo{'text'}->text($tweet->{'tweet'});
 
     my $text = $labels{$num};
@@ -280,9 +289,11 @@ sub thread_tweets {
 
     foreach my $tweetid (sort keys(%{$tweets})) {
 	my $tweet = $tweets->{$tweetid};
-	if ($tweet->{'in_reply_to_status_id'} &&
-	    exists($tweets->{$tweet->{'in_reply_to_status_id'}})) {
-	    push @{$tweets->{$tweet->{'in_reply_to_status_id'}}{'replies'}},
+	my $replyid = $tweet->{'in_reply_to_status_id'} || 
+	  $tweet->{'inreplytoid'};
+	if ($replyid &&
+	    exists($tweets->{$replyid})) {
+	    push @{$tweets->{$replyid}{'replies'}},
 	      $tweet;
 	} else {
 	    push @returnlist, $tweet;
@@ -292,7 +303,9 @@ sub thread_tweets {
 }
 
 sub check_for_new {
+    $cui->status("Fetching Tweets");
     collect_tweets();
+    $cui->nostatus();
     gather_default_tweets(); #XXX just merge in new
 }
 
@@ -300,18 +313,27 @@ sub gather_default_tweets {
     $tweets = get_tweets();
 
     my @keys = keys(%$tweets);
+    my $isnew = 1;
 
     DEBUG("here: keys=" . $#keys);
     if ($#keys == -1) {
-	$tweets = get_tweets("", "limit 20");
+	$tweets = get_tweets("", "limit 100");
+	$isnew = 0;
+	# $tweets = get_tweets("where id = 2515551407 or id = 2515608455 or id = 2517039242","");
     }
-    set_listbox();
+    my $ids = set_listbox();
+
+    if (! $isnew) {
+	DEBUG("selecting $ids->[$#$ids] instead of $ids->[0]\n");
+	$subjectListBox->set_selection($ids->[$#$ids]);
+    }
 }
 
 sub set_listbox {
     my (@ids);
 
     my @threaded = thread_tweets($tweets);
+    DEBUG("THREADED OUTPUT:");
     DEBUG(Dumper(\@threaded));
     my @lines = sprint_each_result(\@threaded, undef, undef, undef, 0,
 				   undef, undef, 1, 1, \@ids);
@@ -323,6 +345,7 @@ sub set_listbox {
     }
     $subjectListBox->labels(\%labels);
     $subjectListBox->values(\@ids);
+    return \@ids;
 }
 
 my $inreplyto;
@@ -357,7 +380,12 @@ sub submit_twit {
     if ($len > 140) {
 	# xxx!!!
     } else {
-	$twit->update({status => $text, @args});
+	$cui->status("Submitting tweet");
+	my $status = $twit->update({status => $text, @args});
+	$cui->nostatus;
+	if (!defined($status)) {
+	    $cui->error("Submitting tweet failed");
+	}
     }
     $inreplyto = '';
     $starttext = '';
@@ -382,7 +410,7 @@ sub do_curses {
     my $twitline = 16;
     my $beyondheaders = 10;
 
-    my $cui = new Curses::UI( -color_support => 1 );
+    $cui = new Curses::UI( -color_support => 1 );
 
 
     my $win = $cui->add('win', 'Window',
@@ -554,6 +582,9 @@ sub get_tweets {
 	my $tweet = $results->{$key};
 	$tweet->{'user'}{'screen_name'} = $tweet->{'fromname'};
 	$tweet->{'text'} = $tweet->{'tweet'};
+	$tweet->{'in_reply_to_status_id'} = $tweet->{'inreplytoid'};
+	$tweet->{'in_reply_to_screen_name'} = $tweet->{'in_reply_to_username'};
+	$tweet->{'in_reply_to_user_id'} = $tweet->{'inreplytouserid'};
     }
 
     return $results;
