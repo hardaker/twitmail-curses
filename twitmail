@@ -308,5 +308,11 @@ Detect that not enough messages could be retrieved and realize you skipped some.
 
 =back
 
+=head1 AUTHOR
+
+Wes Hardaker <hardaker ATAT users.sourceforge.net>
+
+AKA "hardaker" on twitter.com, IRC, and other places
+
 =cut
 
