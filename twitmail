@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+use strict;
+use DBI;
+use Curses::UI;
 use Net::Twitter;
 use Data::Dumper;
 use Text::Wrap;
@@ -8,6 +11,10 @@ use strict;
 use Date::Parse;
 
 our $VERSION = "0.2";
+our $dbh;
+
+my $DBVERSION = 1;
+
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
 
@@ -19,6 +26,8 @@ GetOptions(\%opts,
 	   ["m|modes=s",  "Comma separated modes to use: friends,replies"],
 	   ["u|update",   "Set your status from arguments"],
 	   ["r|reply=i",  "Reply to message number INTEGER with text from arguments"],
+	   ["c|curses",   "Display curses interface"],
+	   ["C|collect-db", "just collect data"],
 	   ["f|follow=s", "Follow the user named STRING"],
 	   ["S|no-save",  "Don't save the config file back"],
 	   ["I|indent-depth", "Amount of spaces to use when indenting"],
@@ -56,6 +65,16 @@ if ($opts{'r'}) {
 # add a friend if needed
 if ($opts{'f'}) {
     $twit->create_friend({id => $opts{'f'}, follow => '1'});
+}
+
+if ($opts{'c'}) {
+    do_curses();
+    exit;
+}
+
+if ($opts{'C'}) {
+    collect_tweets();
+    exit;
 }
 
 # display mail
@@ -200,6 +219,187 @@ sub format_message {
     }
     return $output;
 }
+
+##############################################################################
+# CURSES
+#   (foiled again)
+#
+
+my $tl;
+my $count = 0;
+my $tweets;
+
+sub show_msg {
+    $tl->text("c:" . ($count++) . " " .  $_[0]->get_active_value());
+}
+
+sub do_curses {
+#    import  Curses::UI;
+    $tweets = get_tweets();
+
+    my (@ids, %text);
+    foreach my $tweet (@$tweets) {
+	push @ids, $tweet->[0];
+	$text{$tweet->[0]} = 
+	  sprintf("%-12.12s %s", $tweet->[2], $tweet->[$#$tweet-1]);
+    }
+
+    my $cui = new Curses::UI( -color_support => 1 );
+
+
+    my $win = $cui->add('win', 'Window',
+			 -border => 1,
+			 -y      => 1, # eventually a menu
+			 -bfg    => 'red');
+
+    my $listb = $win->add("lb", "Listbox",
+			  -values => \@ids,
+			  -labels => \%text,
+			  -onselchange => \&show_msg,
+			  -width => -1,
+			  -height => 15);
+    $listb->focus();
+
+    $tl = $win->add("tl", "Label", -text => "baaar\nbaz", -y => -2, -width => -1);
+
+    #    my $text = $win->add("text1", "TextEditor");
+    #    $text->focus();
+
+    $cui->set_binding(sub {exit} , "\cQ");
+    $cui->mainloop();
+}
+
+my $instweeth;
+my $deltweeth;
+sub remember_tweets {
+    my @tweets = @_;
+    if (!$instweeth) {
+	$deltweeth = $dbh->prepare_cached("delete from tweets where id = ?");
+	$instweeth =
+	  $dbh->prepare_cached("insert into tweets(id, fromid, fromuser,
+                                                   fromname, fromdesc, fromurl,
+                                                   created_at, inreplytoid,
+                                                   inreplytouserid,
+                                                   inreplytousername,
+                                                   tweet)
+                                values(?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?)");
+	die "failed to create insert to tweets statement $! $@"
+	  if (!$instweeth);
+    }
+    foreach my $tweet (@tweets) {
+	$deltweeth->execute($tweet->{'id'});  # delete any old copy
+	$instweeth->execute($tweet->{'id'},
+			    $tweet->{'user'}{'id'},
+			    $tweet->{'user'}{'screen_name'},
+			    $tweet->{'user'}{'name'},
+			    $tweet->{'user'}{'desc'},
+			    $tweet->{'user'}{'url'},
+			    $tweet->{'created_at'},
+			    $tweet->{'in_reply_to_status_id'},
+			    $tweet->{'in_reply_to_user_id'},
+			    $tweet->{'in_reply_to_screen_name'},
+			    $tweet->{'text'});
+    }
+}
+
+my $gettweeth;
+sub get_tweets {
+    init_dbh();
+    if (!$gettweeth) {
+	$gettweeth =
+	  $dbh->prepare_cached("select * from tweets $_[0] order by id desc $_[1]");
+    }
+    $gettweeth->execute();
+    my $results = $gettweeth->fetchall_arrayref();
+    return $results;
+}
+
+sub collect_tweets {
+    init_dbh();
+    my $lastid = get_config('last_id');
+
+    my $friend_data = $twit->friends_timeline();
+    remember_tweets(@$friend_data);
+
+#     $twit->replies(\%args), $mode, 'since_id', 'id');
+
+#     if ($mode eq 'friends') {
+# 	print_results($twit->friends_timeline(\%args), $mode, 'since_id', 'id');
+#     }
+
+#     if ($mode eq 'public') {
+# 	print_results($twit->public_timeline(\%args), $mode);
+}
+
+my $paramconfig;
+sub get_config {
+    my ($name) = @_;
+    # check the DB version
+    if (!$paramconfig) {
+	$paramconfig = $dbh->prepare_cached("select value from twitmail where name = '$name'");
+    }
+    my $result = '';
+    if ($paramconfig) {
+	$paramconfig->execute();
+	$result = $paramconfig->fetchrow_arrayref();
+	$result = $result->[0] if (ref($result) eq 'ARRAY');
+	$paramconfig->finish(); # required to work around a bug.
+    }
+    return $result;
+}
+
+my $setparamconfig;
+my $delparamconfig;
+sub set_config {
+    my ($name, $value) = @_;
+    # check the DB version
+    if (!$setparamconfig) {
+	$setparamconfig = $dbh->prepare_cached("insert into twitmail(name, value) values(?, ?)");
+	$delparamconfig = $dbh->prepare_cached("delete from twitmail where name = ?");
+    }
+    $delparamconfig->execute($name);
+    $setparamconfig->execute($name, $value);
+}
+
+sub init_dbh {
+    # set up the DB
+    $dbh = DBI->connect("DBI:SQLite:dbname=" . $ENV{'HOME'} . "/.twitmaildb");
+    $dbh->{'sqlite_handle_binary_nulls'} = 1;
+    $dbh->{'unicode'} = 1;
+
+    # check the DB version
+    my $ver = get_config('dbversion');
+    print "DATABASE VERSION: $ver\n";
+    return if ($ver eq $DBVERSION);
+    setup_database();
+}
+
+sub setup_database {
+
+    print "CREATING DATABASE\n";
+    # create the DB
+    $dbh->do("CREATE table twitmail (
+              name       varchar(255),
+              value      varchar(4096)
+              )");
+    $dbh->do("INSERT into twitmail(name, value) values('dbversion','" . $DBVERSION . "')");
+
+    $dbh->do("CREATE table tweets (
+              id                                 int,
+              fromid                             int,
+              fromuser                           varchar(4096),
+              fromname                           varchar(4096),
+              fromdesc                           varchar(4096),
+              fromurl                            varchar(4096),
+              created_at                         varchar(4096),
+              inreplytoid                        int,
+              inreplytouserid                    int,
+              inreplytousername                  varchar(4096),
+              tweet                              varchar(4096),
+              twitmailstatus                     varchar(4096)
+             )");
+}
+
 
 =pod
 
