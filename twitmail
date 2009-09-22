@@ -35,9 +35,9 @@ my %prefdefaults =
   );
 
 my @helptexts =
-  (" (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (>) more help",
-   " (^) Show Parent |  (p)references | (/) Search Tweets | (>) more help ",
-   " (ctrl-q) Quit | (>) more help "
+  (" (g)et new tweets | (TAB) move to post field | (>) more help",
+   " (o)pen URL | (^) Show Parent |  (p)references | (>) more help ",
+   " (/) Search Tweets | (ctrl-q) Quit | (>) more help "
    );
 my $helpnum = -1;
 
@@ -1015,9 +1015,17 @@ twitmail - Because some tweets you just can't afford to miss
 
 =head1 SYNOPSIS
 
+=head2 Curses Interface
+
+Simply run "twitmail" and fill out the preferences and get started!
+
+=head2 Command Line
+
+Or you can use the command line interface:
+
 Read new twits:
 
-  # twitmail
+  # twitmail -l
   ---- friends ---------------------------------------------------------
   01 Tue 18:33 airsax     woohoo finally my DSP board plays nice with my
                           macbook!!!  i've spent on and off the last 3
@@ -1051,24 +1059,33 @@ Check for new updates (note how replies to me (@hardaker) are singled out):
 
 =head1 DESCRIPTION
 
-B<twitmail> was designed as a command-line client to keep track of
+B<twitmail> implementas a "mail-like" interface to twitter.  In
+particular, it presents it's data in a mail-reader like iterface where
+incoming tweets are represented as "new" when you haven't read them.
+It provides "reply" and "forward" actions so you can reply and retweet
+to the things you're staring at.  Tweets are kept locally in your
+local database so searching through past tweets is easy with it's
+search facility.  And most importantly, it tries to collect "all the
+tweets since the last time you read it", unlike the web interfaces
+that only show you the last 20 or so.  It's designed so you never miss
+those important tweets from friends!
+
+To get started, simply run "twitmail" and it'll throw you into the
+configuration section where you can fill out your twitter account
+information and a few other settings.  Save the settings and you'll be
+placed into the reading interface with a few "help" tweets in it.
+There is a "help" line at the bottom of the page that shows you some
+of the key bindings.  The ">" key will rotate through showing these
+helpful keybinds.
+
+B<twitmail> also provides a command-line client to keep track of
 tweets that have occured.  Yes, I have fancy graphical clients to do
 that too.  But, most of them don't easily show replies to my previous
 mesasges without scrolling back a ways.  Especially when I've been
 gone for 3 days.  So, twitmail was designed to accomodate that need
 and just print a quick summary of tweets that have arrived.
 
-By default, running twitmail without arguments checks for both replies
-and friend updates.
-
-=head1 CONFIGURATION
-
-You need to put the following two lines in a ~/.twitmailrc file:
-
-  user     TWITER-USER-NAME
-  password TWITTER-PASSWORD
-
-=head1 OPTIONS
+=head1 OPTIONS (commnad line usage only)
 
 =over
 

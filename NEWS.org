@@ -1,5 +1,9 @@
 TwitMail Release News
 
+* 0.4
+  - Fixed startup and documentation.  Should work out of the box
+    better now.
+
 * 0.3
   - Wrote a completely new, very slick curses interface (can curses be
     slick?).  This is now the default mode, although the command line
