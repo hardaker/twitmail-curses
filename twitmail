@@ -56,8 +56,11 @@ my %config;
 read_config();
 init_dbh();
 
-my $twit = Net::Twitter->new(username => $config{'user'} || get_config('name'),
-			     password => $config{'password'} || get_config('pass'),
+DEBUG("user: " . (username => $config{'user'} || get_config('name')));
+DEBUG("pass: " . (username => $config{'password'} || get_config('pass')));
+
+my $twit = Net::Twitter->new(username => ($config{'user'} || get_config('name')),
+			     password => ($config{'password'} || get_config('pass')),
 			     source => 'twitmail');
 
 #$twit->credentials($config{'user'}, $config{'password'});
