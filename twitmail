@@ -17,6 +17,17 @@ our $DEBUG = 1;
 
 my $DBVERSION = 1;
 
+my %prefwidgets;
+my @preferences =
+  ( name => 'Twitter Name',
+    pass => 'Twitter Password',
+    undef,
+    fetchunread => 'Tweets to show when nothing new',
+  );
+
+my %prefdefaults =
+  (fetchunread => 100,
+  );
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
 
@@ -43,9 +54,10 @@ $DEBUG = 1 if ($opts{'D'});
 my %config;
 
 read_config();
+init_dbh();
 
-my $twit = Net::Twitter->new(username => $config{'user'},
-			     password => $config{'password'},
+my $twit = Net::Twitter->new(username => $config{'user'} || get_config('name'),
+			     password => $config{'password'} || get_config('pass'),
 			     source => 'twitmail');
 
 #$twit->credentials($config{'user'}, $config{'password'});
@@ -269,6 +281,9 @@ my $cui;
 my $statusbar;
 my $helpbar;
 
+my $mainwin;
+my $prefwin;
+
 sub show_msg {
     my $num = $_[0]->get_active_value();
     my $tweet = $tweets->{$num};
@@ -338,7 +353,7 @@ sub gather_default_tweets {
     if ($#keys == -1) {
 	# no new tweets; get last 100
 
-	$tweets = get_tweets("", "limit 100");
+	$tweets = get_tweets("", "limit " . get_config('fetchunread',100));
 	$isnew = 0;
 	# $tweets = get_tweets("where id = 2515551407 or id = 2515608455 or id = 2517039242","");
     } else {
@@ -452,6 +467,12 @@ sub update_count {
     }
 }
 
+sub save_prefs {
+    foreach my $pref (keys(%prefwidgets)) {
+	set_config($pref, $prefwidgets{$pref}->get());
+    }
+}
+
 sub do_curses {
 #    import  Curses::UI;
     my $twitline = 16;
@@ -460,10 +481,11 @@ sub do_curses {
     $cui = new Curses::UI( -color_support => 1 );
 
 
-    my $win = $cui->add('win', 'Window',
+    $mainwin = $cui->add('win', 'Window',
 			 -border => 1,
 			 -y      => 1, # eventually a menu
 			 -bfg    => 'blue');
+    my $win = $mainwin;
 
     $subjectListBox = $win->add("lb", "Listbox",
 				-values => [],
@@ -477,6 +499,7 @@ sub do_curses {
     $subjectListBox->set_binding(\&retweet  ,      "f");
     $subjectListBox->set_binding(\&openurl  ,      "o");
     $subjectListBox->set_binding(\&check_for_new , "g");
+    $subjectListBox->set_binding(sub {$prefwin->focus();} , "p");
 
     #
     # From fields
@@ -582,6 +605,49 @@ sub do_curses {
 
     $cui->set_binding(sub {exit} , "\cQ");
     $cui->set_binding(sub {exit} , "q");
+
+    ############################################################
+    # Preferences
+    #
+    $prefwin = $cui->add('prefwin', 'Window',
+			 -border => 1,
+			 -y      => 1, # eventually a menu
+			 -bfg    => 'blue');
+
+    #
+    # build the list of preference widgets
+    #
+    my $prefcount = 1;
+    DEBUG("num prefs: " . $#preferences);
+    for (my $i = 0; $i <= $#preferences; $i++) {
+	$prefcount++;
+	DEBUG("pref: " . $preferences[$i]);
+	if (defined($preferences[$i])) {
+	    DEBUG("pref text: " . $preferences[$i+1]);
+	    $prefwin->add($preferences[$i] . 'lab', "Label",
+			  -x => 1, -y => $prefcount,
+			  -text => $preferences[$i+1] . ":");
+	    $prefwidgets{$preferences[$i]} =
+	      $prefwin->add($preferences[$i] . 'wid', "TextEntry",
+			    -x => 40, -y => $prefcount, -width => 20,
+			    -text => (get_config($preferences[$i]) ||
+				      $prefdefaults{$preferences[$i]} || ""),
+			    -underline => 1);
+	    $i++;
+	}
+    }
+
+    $prefwin->add('ok','Buttonbox', -x => 1, -y => $prefcount+2,
+		  -buttons => [
+			       { -label => "Save",
+				 -onpress => sub { save_prefs();
+						   $mainwin->focus(); }},
+			       { -label => "Cancel",
+				 -onpress => sub { $mainwin->focus(); }}
+			      ]);
+
+    $cui->set_binding(sub {$mainwin->focus();} , "\cC");
+
     $cui->mainloop();
 }
 
@@ -636,7 +702,6 @@ sub get_tweets {
     $clause = "where twitmailstatus = 'N'" if (!defined($clause));
     my $limiter = $_[1] || "";
     my $gettweeth;
-    init_dbh();
     DEBUG("getting tweets: clause=$clause, limit=$limiter");
     $gettweeth =
       $dbh->prepare_cached("select * from tweets   $clause
@@ -708,7 +773,7 @@ sub get_min_id_from_array {
 
 my $paramconfig;
 sub get_config {
-    my ($name) = @_;
+    my ($name, $default) = @_;
     # check the DB version
     if (!$paramconfig) {
 	$paramconfig = $dbh->prepare_cached("select value from twitmail where name = ?");
@@ -720,7 +785,8 @@ sub get_config {
 	$result = $result->[0] if (ref($result) eq 'ARRAY');
 	$paramconfig->finish(); # required to work around a bug.
     }
-    return $result;
+    return $result if ($result || !$default);
+    return $default;
 }
 
 my $setparamconfig;
