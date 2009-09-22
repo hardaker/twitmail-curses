@@ -13,7 +13,7 @@ use Date::Parse;
 
 our $VERSION = "0.2";
 our $dbh;
-our $DEBUG = 0;
+our $DEBUG = 1;
 
 my $DBVERSION = 1;
 
@@ -169,6 +169,8 @@ sub sprint_each_result {
     } else {
 	$intext = " ";
     }
+    my $intextlen = length($intext);
+    my $intextspaces = " " x $intextlen;
 
     foreach my $dat (@$data) {
 
@@ -192,7 +194,7 @@ sub sprint_each_result {
 			   ? "" : $dat->{'user'}{'screen_name'},
 			   $dat->{'text'});
 	$line = wrap("", 
-		     sprintf("%2.2s %-9.9s %-10.10s $intext","", "",""),
+		     sprintf("%2.2s %-9.9s %-10.10s  $intextspaces","", "",""),
 		     $line) unless($nowrap);
 	$line .= "\n";
 	$lastuser = $dat->{'user'}{'screen_name'};
@@ -264,6 +266,8 @@ my $twitedit;
 my %msginfo;
 my %labels;
 my $cui;
+my $statusbar;
+my $helpbar;
 
 sub show_msg {
     my $num = $_[0]->get_active_value();
@@ -309,6 +313,20 @@ sub check_for_new {
     gather_default_tweets(); #XXX just merge in new
 }
 
+sub merge_in_tweets {
+    my @newtweets = @_;
+
+    DEBUG("merging: starting=", Dumper($tweets));
+
+    foreach my $newtweetset (@newtweets) {
+	foreach my $tweetid (keys(%$newtweetset)) {
+	    $tweets->{$tweetid} = $newtweetset->{$tweetid};
+	}
+    }
+
+    DEBUG("after merge: ", Dumper($tweets));
+}
+
 sub gather_default_tweets {
     $tweets = get_tweets();
 
@@ -316,11 +334,18 @@ sub gather_default_tweets {
     my $isnew = 1;
 
     DEBUG("here: keys=" . $#keys);
+
     if ($#keys == -1) {
+	# no new tweets; get last 100
+
 	$tweets = get_tweets("", "limit 100");
 	$isnew = 0;
 	# $tweets = get_tweets("where id = 2515551407 or id = 2515608455 or id = 2517039242","");
+    } else {
+	# merge in the last unread
+	merge_in_tweets(get_tweets("where twitmailstatus <> 'N'", "limit 1"));
     }
+
     my $ids = set_listbox();
 
     if (! $isnew) {
@@ -515,6 +540,9 @@ sub do_curses {
 				);
     $msginfo{'text'}->focusable(0);
 
+    #
+    # outgoing twit editor
+    #
     $twitedit = $win->add("twit", "TextEditor",
 			  -wrapping => 1,
 			  -bfg => 'green',
@@ -531,6 +559,20 @@ sub do_curses {
 			   -height => 1);
     $twitcount->focusable(0);
 
+    #
+    # status bar
+    #
+    my $help = " (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (q)uit";
+    $help .= " " x (78-length($help));
+    $helpbar = $win->add("help", "Label",
+			 -text => $help,
+			 -bg => 'blue',
+			 -y => -1,
+			 -x => 0,
+			 -bfg => 'blue',
+			 -fg => 'black',
+			 -width => 78, -height => 1);
+
     #    my $text = $win->add("text1", "TextEditor");
     #    $text->focus();
 
@@ -539,6 +581,7 @@ sub do_curses {
     set_listbox();
 
     $cui->set_binding(sub {exit} , "\cQ");
+    $cui->set_binding(sub {exit} , "q");
     $cui->mainloop();
 }
 
@@ -621,6 +664,14 @@ sub collect_tweets {
     DEBUG("collecting since $lastid");
 
     my $friend_data = $twit->friends_timeline({since_id => $lastid});
+    my $count = 1;
+    while ($count < 10 && get_max_id_from_array($friend_data) > $lastid) {
+	$count++;
+	my $new_friend_data = $twit->friends_timeline({since_id => $lastid,
+						       page => $count});
+	push @$friend_data, $new_friend_data;
+    }
+    DEBUG("collected $#$friend_data friend tweets ($count pages)");
     my $reply_data = $twit->replies({since_id => $lastid});
 
     my @alldata;
@@ -637,6 +688,14 @@ sub collect_tweets {
     DEBUG("collected: " . ($#alldata+1) . "; new lastid = $lastid");
 
     remember_tweets(@alldata);
+}
+
+sub get_max_id_from_array {
+    my $maxid = -1;
+    my ($tweets) = @_;
+    foreach my $tweet (@$tweets) {
+	$maxid = $tweet->{'id'} if ($maxid < $tweet->{'id'});
+    }
 }
 
 my $paramconfig;
