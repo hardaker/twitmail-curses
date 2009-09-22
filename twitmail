@@ -95,7 +95,7 @@ if ($opts{'f'}) {
     $twit->create_friend({id => $opts{'f'}, follow => '1'});
 }
 
-if (!$opts{'c'}) {
+if (!$opts{'l'}) {
     do_curses();
     exit;
 }
