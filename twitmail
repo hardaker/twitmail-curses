@@ -33,7 +33,9 @@ my %prefdefaults =
 
 my @helptexts =
   (" (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (>) more help",
-   " (^) Show Parent |  (p)references | (/) Search Tweets | (>) more help ");
+   " (^) Show Parent |  (p)references | (/) Search Tweets | (>) more help ",
+   " (ctrl-q) Quit | (>) more help "
+   );
 my $helpnum = -1;
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
@@ -288,6 +290,7 @@ my $mainwin;
 my $prefwin;
 my $helpbar;
 my $statusbar;
+my $msgwin;
 
 sub show_msg {
     my $num = $_[0]->get_active_value();
@@ -305,6 +308,7 @@ sub show_msg {
 	DEBUG("marking $tweet->{id} as read");
 	mark_tweet_as($tweet, '');
     }
+    $msgwin->draw();
 }
 
 sub thread_tweets {
@@ -570,73 +574,82 @@ sub do_curses {
     $subjectListBox->set_binding(sub {$prefwin->focus();} , "p");
     $subjectListBox->set_binding(sub {exit} , "q");
 
+    $msgwin = $mainwin->add('win', 'Window',
+			       -border => 1,
+			       -width => 78,
+			       -height => 9,
+			       -y => $twitline,
+			       -focusable => 0,
+			       -bfg => 'blue');
+    my $msgline = 0;
+
     #
     # From fields
     #
-    $win->add("fromlabel", "Label",
+    $msgwin->add("fromlabel", "Label",
 	      -text => "From: ",
-	      -y => $twitline,
+	      -y => $msgline,
 	      -bg => 'yellow',
 	      -bfg => 'yellow',
 	      -fg => 'black',
 	      -x => 1, -width => $beyondheaders-1, -height => 1);
     $msginfo{'from'} = 
-      $win->add("from", "Label",
-		-y => $twitline,
+      $msgwin->add("from", "Label",
+		-y => $msgline,
 		-x => $beyondheaders, -width => 14, -height => 1,
 	       );
 
     $msginfo{'fromname'} = 
-      $win->add("fromname", "Label",
-		-y => $twitline,
+      $msgwin->add("fromname", "Label",
+		-y => $msgline,
 		-x => $beyondheaders + 15, -width => 30, -height => 1,
 	       );
 
     #
     # in reply to fields
     #
-    $win->add("replylabel", "Label",
+    $msgwin->add("replylabel", "Label",
 	      -text => "Reply:",
 	      -bg => 'yellow',
 	      -bfg => 'yellow',
 	      -fg => 'black',
-	      -y => $twitline+1,
+	      -y => $msgline+1,
 	      -x => 1, -width => $beyondheaders-1, -height => 1);
 
     $msginfo{'reply'} = 
-      $win->add("reply", "Label",
-		-y => $twitline+1,
+      $msgwin->add("reply", "Label",
+		-y => $msgline+1,
 		-x => $beyondheaders, -width => 10, -height => 1,
 	       );
 
     $msginfo{'replyname'} = 
-      $win->add("replyname", "Label",
-		-y => $twitline+1,
+      $msgwin->add("replyname", "Label",
+		-y => $msgline+1,
 		-x => $beyondheaders + 11, -width => 30, -height => 1,
 	       );
 
     #
     # in reply to fields
     #
-    $win->add("datelabel", "Label",
+    $msgwin->add("datelabel", "Label",
 	      -text => "Sent: ",
 	      -bg => 'yellow',
 	      -bfg => 'yellow',
 	      -fg => 'black',
-	      -y => $twitline+2,
+	      -y => $msgline+2,
 	      -x => 1, -width => $beyondheaders-1, -height => 1);
 
     $msginfo{'date'} = 
-      $win->add("date", "Label",
-		-y => $twitline+2,
+      $msgwin->add("date", "Label",
+		-y => $msgline+2,
 		-x => $beyondheaders, -width => 40, -height => 1,
 	       );
 
 
-    $msginfo{'text'} = $win->add("tl", "TextEditor",
+    $msginfo{'text'} = $msgwin->add("tl", "TextEditor",
 				 -readonly => 1, -wrapping => 1,
 				 -text => "",
-				 -y => $twitline + 4,
+				 -y => $msgline + 4,
 				 -x => 3, -width => 76, -height => 4,
 				);
     $msginfo{'text'}->focusable(0);
@@ -649,14 +662,14 @@ sub do_curses {
 			  -bfg => 'green',
 			  -border => 1,
 			  -text => "",
-			  -y => $twitline+9, -x => 0,
+			  -y => $twitline+10, -x => 0,
 			  -width => 78, -height => 4,
 			  -onchange => \&update_count,
 		     );
     $twitedit->set_binding(\&submit_twit , KEY_ENTER);
 
     $twitcount = $win->add("twitcount", "Label",
-			   -y => $twitline+8, -x => 74, -width => 4,
+			   -y => $twitline+9, -x => 74, -width => 4,
 			   -height => 1);
     $twitcount->focusable(0);
 
