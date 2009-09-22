@@ -23,10 +23,12 @@ my @preferences =
     pass => 'Twitter Password',
     undef,
     fetchunread => 'Tweets to show when nothing new',
+    max_tweets   => 'Maximum number of new tweets to fetch',
   );
 
 my %prefdefaults =
   (fetchunread => 100,
+   max_tweets => 200,
   );
 
 my @helptexts =
@@ -821,6 +823,7 @@ sub get_tweets {
 sub collect_tweets {
     init_dbh();
     my $lastid = get_config('last_id') || 1;
+    my $max_pages = get_config('max_tweets')/20 || 200;
 
     DEBUG("collecting since $lastid");
 
@@ -830,7 +833,7 @@ sub collect_tweets {
     my $lowid = get_min_id_from_array($friend_data);
     DEBUG(" lowest id collected in page 1: $lowid");
     my $count = 1;
-    while ($count < 10 && $#$friend_data > -1 && $lowid > $lastid) {
+    while ($count < $max_pages && $#$friend_data > -1 && $lowid > $lastid) {
 	$count++;
 	my $new_friend_data = $twit->friends_timeline({since_id => $lastid,
 						       page => $count});
