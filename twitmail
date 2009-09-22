@@ -34,7 +34,10 @@ GetOptions(\%opts,
 	   ["I|indent-depth", "Amount of spaces to use when indenting"],
 	   ["n|count=i",  "Number of messages to return (max)"],
 	   ["d|dump",     "Dumper the results instead of nicely printing"],
+	   ["D|debug",    "output DEBUG to ~/.twitmail.debug"],
 	  );
+
+$DEBUG = 1 if ($opts{'D'});
 
 my %config;
 
@@ -254,10 +257,21 @@ sub show_msg {
     $msginfo{'date'}->text($tweet->{'created_at'});
     $msginfo{'reply'}->text($tweet->{'inreplytousername'});
     $msginfo{'text'}->text($tweet->{'tweet'});
+    if ($tweet->{'twitmailstatus'} eq 'N') {
+	DEBUG("marking $tweet->{id} as read");
+	mark_tweet_as($tweet, '');
+    }
 }
 
 sub set_listbox {
     $tweets = get_tweets();
+
+    my @keys = keys(%$tweets);
+
+    DEBUG("here: keys=" . $#keys);
+    if ($#keys == -1) {
+	$tweets = get_tweets("", "limit 20");
+    }
 
     my (@ids, %text);
     foreach my $tweet (sort keys(%$tweets)) {
@@ -406,13 +420,28 @@ sub remember_tweets {
     }
 }
 
-my $gettweeth;
-sub get_tweets {
-    init_dbh();
-    if (!$gettweeth) {
-	$gettweeth =
-	  $dbh->prepare_cached("select * from tweets $_[0] order by id desc $_[1]");
+my $markh;
+sub mark_tweet_as {
+    my ($tweet, $status) = @_;
+    if (!$markh) {
+	$markh = $dbh->prepare_cached("update tweets set twitmailstatus = ?
+                                        where id = ?");
     }
+    $tweet = $tweet->{'id'} if (ref($tweet) eq 'HASH');
+    DEBUG(" ...marking $tweet as '$status'");
+    $markh->execute($status, $tweet);
+}
+
+sub get_tweets {
+    my $clause = $_[0];
+    $clause = "where twitmailstatus = 'N'" if (!defined($clause));
+    my $limiter = $_[1] || "";
+    my $gettweeth;
+    init_dbh();
+    DEBUG("getting tweets: clause=$clause, limit=$limiter");
+    $gettweeth =
+      $dbh->prepare_cached("select * from tweets   $clause
+                             order by id desc      $limiter ");
     $gettweeth->execute();
     my $results = $gettweeth->fetchall_hashref('id');
     return $results;
@@ -423,7 +452,7 @@ sub collect_tweets {
     init_dbh();
     my $lastid = get_config('last_id');
 
-    DEBUG("collecting since $lastid\n");
+    DEBUG("collecting since $lastid");
 
     my $friend_data = $twit->friends_timeline({since_id => $lastid});
     my $reply_data = $twit->replies({since_id => $lastid});
@@ -438,7 +467,7 @@ sub collect_tweets {
     }
     set_config('last_id', $lastid);
 
-    DEBUG("collected: " . ($#alldata+1) . "; new lastid = $lastid\n");
+    DEBUG("collected: " . ($#alldata+1) . "; new lastid = $lastid");
 
     remember_tweets(@alldata);
 
@@ -528,7 +557,7 @@ sub DEBUG {
 	$fh = new IO::File;
 	$fh->open(">" . $ENV{'HOME'} . "/.twitmail.debug");
     }
-    $fh->print(@_);
+    $fh->print(@_,"\n");
 }
 
 =pod
