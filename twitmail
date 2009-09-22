@@ -7,11 +7,12 @@ use Getopt::GUI::Long;
 use strict;
 use Date::Parse;
 
-our $VERSION = "0.1";
+our $VERSION = "0.2";
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
 
-my %opts = (m => 'replies,friends');
+my %opts = (m => 'replies,friends',
+	    I => 4);
 
 GetOptions(\%opts,
 	   ["a|show-all", "Show all messages, not just recent"],
@@ -20,6 +21,7 @@ GetOptions(\%opts,
 	   ["r|reply=i",  "Reply to message number INTEGER with text from arguments"],
 	   ["f|follow=s", "Follow the user named STRING"],
 	   ["S|no-save",  "Don't save the config file back"],
+	   ["I|indent-depth", "Amount of spaces to use when indenting"],
 	   ["n|count=i",  "Number of messages to return (max)"],
 	   ["d|dump",     "Dumper the results instead of nicely printing"],
 	  );
@@ -89,6 +91,8 @@ save_config();
 
 sub print_results {
     my ($data, $mode, $setarg, $setfrom) = @_;
+    my @newdata;
+    my %ids;
 
     if ($opts{'d'}) {
 	print Dumper($_[0]);
@@ -104,11 +108,29 @@ sub print_results {
     }
 
     return if ($#$data == -1);
-
     print "---- $mode ------------------------------------------------------------\n";
 
-    my $lastday = "";
-    my $lastuser = "";
+    foreach my $dat (@$data) {
+	$ids{$dat->{'id'}} = $dat;
+    }
+    foreach my $dat (@$data) {
+	if ($dat->{'in_reply_to_status_id'} &&
+	    exists($ids{$dat->{'in_reply_to_status_id'}})) {
+	    push @{$ids{$dat->{'in_reply_to_status_id'}}{'replies'}}, $dat;
+	} else {
+	    push @newdata, $dat;
+	}
+    }
+    print_each_result(\@newdata, $mode, $setarg, $setfrom, 0, "", "");
+}
+
+sub print_each_result {
+    my ($data, $mode, $setarg, $setfrom, $indent, $lastday, $lastuser) = @_;
+
+    $indent ||= 0;
+
+    my $intext = " " x ($indent * $opts{'I'});
+
     foreach my $dat (reverse @$data) {
 
 	$msgnum++;
@@ -124,11 +146,11 @@ sub print_results {
 	$lastday = $thisday;
 
 	# print the results
-	print wrap(sprintf("%2.2d %-9.9s %-10.10s ", $msgnum,
+	print wrap(sprintf("%2.2d %-9.9s %-10.10s $intext", $msgnum,
 			   $dat->{'created_at'},
 			   ($lastuser eq $dat->{'user'}{'screen_name'})
 			   ? "" : $dat->{'user'}{'screen_name'}),
-		   sprintf("%2.2s %-9.9s %-10.10s ","", "",""),
+		   sprintf("%2.2s %-9.9s %-10.10s $intext","", "",""),
 		   $dat->{'text'}),"\n";
 	$lastuser = $dat->{'user'}{'screen_name'};
 
@@ -138,6 +160,12 @@ sub print_results {
 	  $dat->{'id'} if (exists($dat->{'id'}));
 	$config{'usernum' . $formattednum} =
 	  $dat->{'user'}{'screen_name'} if (exists($dat->{'user'}));
+
+	if (exists($dat->{'replies'})) {
+	    print_each_result($dat->{'replies'}, $mode, $setarg, $setfrom,
+			      $indent+1, $lastday, $lastuser);
+	}
+
     }
 
 #    print "  ", Dumper($twit->get_error()),"\n";
