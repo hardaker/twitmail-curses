@@ -372,6 +372,21 @@ sub gather_default_tweets {
     }
 }
 
+sub fetch_parent {
+    my ($widget) = @_[0];
+    # merge in the last unread
+    my $currentid = $widget->get_active_value();;
+    my $parentid  = $tweets->{$currentid}{'inreplytoid'};
+    if (!$parentid) {
+	$cui->status("This tweet is not a reply and doesn't have a parent tweet");
+	sleep(2);
+	$cui->nostatus;
+	return;
+    }
+    merge_in_tweets(get_tweets("where id = $parentid")); # XXX: fix to ? syntax
+    set_listbox();
+}
+
 sub set_listbox {
     my (@ids);
 
@@ -499,10 +514,12 @@ sub do_curses {
 				-height => 15);
     $subjectListBox->focus();
     $subjectListBox->set_binding(\&reply_to ,      "r");
+    $subjectListBox->set_binding(\&fetch_parent ,  "^");
     $subjectListBox->set_binding(\&retweet  ,      "f");
     $subjectListBox->set_binding(\&openurl  ,      "o");
     $subjectListBox->set_binding(\&check_for_new , "g");
     $subjectListBox->set_binding(sub {$prefwin->focus();} , "p");
+    $subjectListBox->set_binding(sub {exit} , "q");
 
     #
     # From fields
@@ -607,7 +624,6 @@ sub do_curses {
     set_listbox();
 
     $cui->set_binding(sub {exit} , "\cQ");
-    $cui->set_binding(sub {exit} , "q");
 
     ############################################################
     # Preferences
