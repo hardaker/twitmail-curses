@@ -827,18 +827,22 @@ sub collect_tweets {
     my $friend_data = $twit->friends_timeline({
 					       since_id => $lastid
 					      });
-    DEBUG(" lowest id collected in page 1: " . get_min_id_from_array($friend_data));
+    my $lowid = get_min_id_from_array($friend_data);
+    DEBUG(" lowest id collected in page 1: $lowid");
     my $count = 1;
-    while ($count < 10 && get_min_id_from_array($friend_data) > $lastid) {
+    while ($count < 10 && $#$friend_data > -1 && $lowid > $lastid) {
 	$count++;
 	my $new_friend_data = $twit->friends_timeline({since_id => $lastid,
 						       page => $count});
 	push @$friend_data, @$new_friend_data;
-	DEBUG(" lowest id collected in page $count: " . get_min_id_from_array($friend_data));
+	$lowid = get_min_id_from_array($friend_data);
+	DEBUG(" lowest id collected in page $count: $lowid");
     }
     DEBUG("lastid:      $lastid");
-    DEBUG("collectedid: " . get_min_id_from_array($friend_data));
+    DEBUG("collectedid: $lowid");
     DEBUG("collected $#$friend_data friend tweets ($count pages)");
+
+
     my $reply_data = $twit->replies({since_id => $lastid});
 
     my @alldata;
@@ -846,9 +850,7 @@ sub collect_tweets {
     push @alldata, @$reply_data if (defined($reply_data));
 
     # don't assume perfectly sorted
-    foreach my $tweet (@alldata) {
-	$lastid = $tweet->{'id'} if ($tweet->{'id'} > $lastid);
-    }
+    $lastid = get_max_id_from_array(\@alldata);
     set_config('last_id', $lastid);
     set_config('last_poll', time());
 
