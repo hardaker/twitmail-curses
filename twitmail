@@ -740,10 +740,12 @@ sub do_curses {
 
 my $instweeth;
 my $deltweeth;
+my $gettweeth;
 sub remember_tweets {
     my @tweets = @_;
     if (!$instweeth) {
 	$deltweeth = $dbh->prepare_cached("delete from tweets where id = ?");
+	$gettweeth = $dbh->prepare_cached("select id from tweets where id = ?");
 	$instweeth =
 	  $dbh->prepare_cached("insert into tweets(id, fromid, fromuser,
                                                    fromname, fromdesc, fromurl,
@@ -756,19 +758,25 @@ sub remember_tweets {
 	  if (!$instweeth);
     }
     foreach my $tweet (@tweets) {
-	$deltweeth->execute($tweet->{'id'});  # delete any old copy
-	$instweeth->execute($tweet->{'id'},
-			    $tweet->{'user'}{'id'},
-			    $tweet->{'user'}{'screen_name'},
-			    $tweet->{'user'}{'name'},
-			    $tweet->{'user'}{'desc'},
-			    $tweet->{'user'}{'url'},
-			    $tweet->{'created_at'},
-			    $tweet->{'in_reply_to_status_id'},
-			    $tweet->{'in_reply_to_user_id'},
-			    $tweet->{'in_reply_to_screen_name'},
-			    $tweet->{'text'},
-			    'N');
+	$gettweeth->execute($tweet->{'id'});
+	if (! $gettweeth->fetchrow_array()) {
+	    # doesn't exist yet, so insert it
+	    $instweeth->execute($tweet->{'id'},
+				$tweet->{'user'}{'id'},
+				$tweet->{'user'}{'screen_name'},
+				$tweet->{'user'}{'name'},
+				$tweet->{'user'}{'desc'},
+				$tweet->{'user'}{'url'},
+				$tweet->{'created_at'},
+				$tweet->{'in_reply_to_status_id'},
+				$tweet->{'in_reply_to_user_id'},
+				$tweet->{'in_reply_to_screen_name'},
+				$tweet->{'text'},
+				'N');
+	} else {
+	    DEBUG($tweet->{'id'} . " is a duplicate tweet");
+	}
+	$gettweeth->finish();
     }
 }
 
@@ -816,14 +824,20 @@ sub collect_tweets {
 
     DEBUG("collecting since $lastid");
 
-    my $friend_data = $twit->friends_timeline({since_id => $lastid});
+    my $friend_data = $twit->friends_timeline({
+					       since_id => $lastid
+					      });
+    DEBUG(" lowest id collected in page 1: " . get_min_id_from_array($friend_data));
     my $count = 1;
     while ($count < 10 && get_min_id_from_array($friend_data) > $lastid) {
 	$count++;
 	my $new_friend_data = $twit->friends_timeline({since_id => $lastid,
 						       page => $count});
-	push @$friend_data, $new_friend_data;
+	push @$friend_data, @$new_friend_data;
+	DEBUG(" lowest id collected in page $count: " . get_min_id_from_array($friend_data));
     }
+    DEBUG("lastid:      $lastid");
+    DEBUG("collectedid: " . get_min_id_from_array($friend_data));
     DEBUG("collected $#$friend_data friend tweets ($count pages)");
     my $reply_data = $twit->replies({since_id => $lastid});
 
@@ -855,8 +869,13 @@ sub get_min_id_from_array {
     my ($tweets) = @_;
     my $minid;
     foreach my $tweet (@$tweets) {
+	if (ref($tweet) ne 'HASH') {
+	    DEBUG("ack: not a hash: " . Dumper($tweet));
+	    exit;
+	}
 	$minid = $tweet->{'id'} if (!$minid || $minid > $tweet->{'id'});
     }
+    return $minid;
 }
 
 my $paramconfig;
