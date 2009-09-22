@@ -376,6 +376,19 @@ sub retweet {
     set_twit_text($starttext);
 }
 
+sub openurl {
+    my ($widget) = @_[0];
+    return if (!$widget);
+    my $tweetid = $widget->get_active_value();;
+    my $tweet = $tweets->{$tweetid}{'tweet'};
+    $tweet =~ s/.*http//;
+    $tweet =~ s/\s+.*//;
+    $cui->status("Opening $tweet");
+    # XXX: security quote
+    system("firefox '$tweet' &");
+    $cui->nostatus();
+}
+
 sub submit_twit {
     my $text = $twitedit->get();
     my @args;
@@ -437,6 +450,7 @@ sub do_curses {
     $subjectListBox->focus();
     $subjectListBox->set_binding(\&reply_to ,      "r");
     $subjectListBox->set_binding(\&retweet  ,      "f");
+    $subjectListBox->set_binding(\&openurl  ,      "o");
     $subjectListBox->set_binding(\&check_for_new , "g");
 
     #
