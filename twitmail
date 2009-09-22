@@ -67,9 +67,8 @@ init_dbh();
 DEBUG("user: " . (username => $config{'user'} || get_config('name')));
 DEBUG("pass: " . (username => $config{'password'} || get_config('pass')));
 
-my $twit = Net::Twitter->new(username => ($config{'user'} || get_config('name')),
-			     password => ($config{'password'} || get_config('pass')),
-			     source => 'twitmail');
+my $twit;
+init_twit();
 
 #$twit->credentials($config{'user'}, $config{'password'});
 
@@ -93,6 +92,7 @@ if ($opts{'r'}) {
 # add a friend if needed
 if ($opts{'f'}) {
     $twit->create_friend({id => $opts{'f'}, follow => '1'});
+    exit;
 }
 
 if (!$opts{'l'}) {
@@ -372,7 +372,7 @@ sub gather_default_tweets {
 
     my $ids = set_listbox();
 
-    if (! $isnew) {
+    if (! $isnew && $#$ids > -1) {
 	DEBUG("selecting $ids->[$#$ids] instead of $ids->[0]\n");
 	$subjectListBox->set_selection($ids->[$#$ids]);
     }
@@ -743,12 +743,17 @@ sub do_curses {
 		  -buttons => [
 			       { -label => "Save",
 				 -onpress => sub { save_prefs();
+						   init_twit();
 						   $mainwin->focus(); }},
 			       { -label => "Cancel",
 				 -onpress => sub { $mainwin->focus(); }}
 			      ]);
 
     $cui->set_binding(sub {$mainwin->focus();} , "\cC");
+
+    if (!$twit) {
+	$prefwin->focus();
+    }
 
     $cui->mainloop();
 }
@@ -941,6 +946,20 @@ sub init_dbh {
     setup_database();
 }
 
+sub init_twit {
+    my $user = $config{'user'} || get_config('name');
+    my $pass = $config{'password'} || get_config('pass');
+
+    if ($user && $pass) {
+	$twit = Net::Twitter->new(username => $user,
+			    password => $pass,
+			    source => 'twitmail');
+    } else {
+	$twit = undef;
+    }
+}
+
+
 ######################################################################
 # DATABASE
 #
@@ -969,6 +988,8 @@ sub setup_database {
               tweet                              varchar(4096),
               twitmailstatus                     varchar(4096)
              )");
+    $dbh->do("INSERT into tweets values('1', '14429718', 'hardaker', 'twitmail author', '', '', '', '', '', '', 'Welcome to twitmail!  Use up/down to change messages.  Press the > key to show more help.', 'N')");
+    $dbh->do("INSERT into tweets values('2', '14429718', 'hardaker', 'twitmail author', '', '', '', '', '', '', 'Press the \"g\" key to fetch new twitter messages to read.', 'N')");
 }
 
 my $fh;

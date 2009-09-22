@@ -1,5 +1,10 @@
 TwitMail Release News
 
+* 0.3
+  - Wrote a completely new, very slick curses interface (can curses be
+    slick?).  This is now the default mode, although the command line
+    ability is still available as well.
+
 * 0.2
   - Indent replies so they look like
 
