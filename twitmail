@@ -820,7 +820,7 @@ sub get_tweets {
 
 sub collect_tweets {
     init_dbh();
-    my $lastid = get_config('last_id');
+    my $lastid = get_config('last_id') || 1;
 
     DEBUG("collecting since $lastid");
 
@@ -850,7 +850,7 @@ sub collect_tweets {
     push @alldata, @$reply_data if (defined($reply_data));
 
     # don't assume perfectly sorted
-    $lastid = get_max_id_from_array(\@alldata);
+    $lastid = get_max_id_from_array(\@alldata) if ($#alldata > -1);
     set_config('last_id', $lastid);
     set_config('last_poll', time());
 
@@ -865,6 +865,7 @@ sub get_max_id_from_array {
     foreach my $tweet (@$tweets) {
 	$maxid = $tweet->{'id'} if (!$maxid || $maxid < $tweet->{'id'});
     }
+    return $maxid;
 }
 
 sub get_min_id_from_array {
