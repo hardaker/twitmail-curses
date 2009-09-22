@@ -31,7 +31,7 @@ my %prefdefaults =
 
 my @helptexts =
   (" (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (>) more help",
-   " (^) Show Parent |  (p)references | (>) more help ");
+   " (^) Show Parent |  (p)references | (/) Search Tweets | (>) more help ");
 my $helpnum = -1;
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
@@ -394,7 +394,7 @@ sub set_listbox {
     }
     $subjectListBox->labels(\%labels);
     $subjectListBox->values(\@ids);
-    set_status("Showing $#ids tweets");
+    set_status("Showing " . ($#ids + 1) . " tweets");
     return \@ids;
 }
 
@@ -519,6 +519,25 @@ sub rotate_help {
     $helpbar->draw();
 }
 
+sub search_text {
+    my $answer =
+      $cui->question(-question => "Enter text to search past tweets for:",
+		     -title => "Search For Text");
+    if ($answer) {
+	$answer = "%$answer%";
+	$tweets = get_tweets("where tweet like ?", "", $answer);
+	my @keys = keys(%$tweets);
+	if ($#keys == -1) {
+	    $cui->error("no tweets found for that search");
+	} else {
+	    set_listbox();
+	}
+    } else {
+	set_status("No search text entered; cancelling search...");
+    }
+}
+
+
 ######################################################################
 # CURSES SETUP
 #
@@ -551,6 +570,7 @@ sub do_curses {
     $subjectListBox->set_binding(\&openurl  ,      "o");
     $subjectListBox->set_binding(\&check_for_new , "g");
     $subjectListBox->set_binding(\&rotate_help ,   ">");
+    $subjectListBox->set_binding(\&search_text ,   "/");
     $subjectListBox->set_binding(sub {$prefwin->focus();} , "p");
     $subjectListBox->set_binding(sub {exit} , "q");
 
@@ -888,6 +908,10 @@ sub init_dbh {
     return if ($ver eq $DBVERSION);
     setup_database();
 }
+
+######################################################################
+# DATABASE
+#
 
 sub setup_database {
 
