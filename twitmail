@@ -12,7 +12,7 @@ use Getopt::GUI::Long;
 use strict;
 use Date::Parse;
 
-our $VERSION = "0.41";
+our $VERSION = "0.42";
 our $dbh;
 our $DEBUG = 0;
 
