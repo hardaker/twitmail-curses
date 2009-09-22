@@ -12,7 +12,9 @@ use ExtUtils::MakeMaker;
 			     Text::Wrap => 0,
 			     Date::Parse => 0,
 			     Curses::UI => 0,
+			     Curses => 0,
 			     DBI => 0,
+			     Term::ReadKey => 0,
 			   },
 	 'EXE_FILES'    => [qw(twitmail)],
          'VERSION_FROM' => 'twitmail',         # finds $VERSION

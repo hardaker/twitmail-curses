@@ -1,5 +1,9 @@
 TwitMail Release News
 
+* 0.41
+  - minor update to ensure twitmail will run in smaller screen sizes
+  - add more dependencies to the Makefile.PL
+
 * 0.4
   - Fixed startup and documentation.  Should work out of the box
     better now.
