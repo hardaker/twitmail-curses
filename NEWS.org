@@ -21,3 +21,17 @@ TwitMail Release News
 * 0.1
   - First Release
 
+#+TITLE:     NEWS.org
+#+AUTHOR:    Wes Hardaker
+#+EMAIL:     hardaker@sparta.com
+#+DATE:      2009-08-11 Tue
+#+DESCRIPTION: 
+#+KEYWORDS: 
+#+LANGUAGE:  en
+#+OPTIONS:   H:3 num:nil toc:nil \n:nil @:t ::t |:t ^:t -:t f:t *:t <:t
+#+OPTIONS:   TeX:t LaTeX:nil skip:nil d:nil todo:t pri:nil tags:not-in-toc
+#+INFOJS_OPT: view:nil toc:nil ltoc:t mouse:underline buttons:0 path:http://orgmode.org/org-info.js
+#+EXPORT_SELECT_TAGS: export
+#+EXPORT_EXCLUDE_TAGS: noexport
+#+LINK_UP:   
+#+LINK_HOME: 

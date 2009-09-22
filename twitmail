@@ -36,7 +36,7 @@ my %prefdefaults =
 
 my @helptexts =
   (" (g)et new tweets | (TAB) move to post field | (>) more help",
-   " (o)pen URL | (^) Show Parent |  (p)references | (>) more help ",
+   " (r)eply | (f)orward/retweet | (o)pen URL | (^) Show Parent |  (p)references | (>) more help ",
    " (/) Search Tweets | (ctrl-q) Quit | (>) more help "
    );
 my $helpnum = -1;
@@ -858,7 +858,9 @@ sub collect_tweets {
 	$count++;
 	my $new_friend_data = $twit->friends_timeline({since_id => $lastid,
 						       page => $count});
-	push @$friend_data, @$new_friend_data;
+	if ($new_friend_data) {
+	    push @$friend_data, @$new_friend_data;
+	}
 	$lowid = get_min_id_from_array($friend_data);
 	DEBUG(" lowest id collected in page $count: $lowid");
     }
