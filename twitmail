@@ -12,6 +12,7 @@ use Date::Parse;
 
 our $VERSION = "0.2";
 our $dbh;
+our $DEBUG = 0;
 
 my $DBVERSION = 1;
 
@@ -422,7 +423,7 @@ sub collect_tweets {
     init_dbh();
     my $lastid = get_config('last_id');
 
-    print "collecting since $lastid\n";
+    DEBUG("collecting since $lastid\n");
 
     my $friend_data = $twit->friends_timeline({since_id => $lastid});
     my $reply_data = $twit->replies({since_id => $lastid});
@@ -437,7 +438,7 @@ sub collect_tweets {
     }
     set_config('last_id', $lastid);
 
-    print "collected: " . ($#alldata+1) . "; new lastid = $lastid\n";
+    DEBUG("collected: " . ($#alldata+1) . "; new lastid = $lastid\n");
 
     remember_tweets(@alldata);
 
@@ -520,6 +521,15 @@ sub setup_database {
              )");
 }
 
+my $fh;
+sub DEBUG {
+    return if (!$DEBUG);
+    if (!$fh) {
+	$fh = new IO::File;
+	$fh->open(">" . $ENV{'HOME'} . "/.twitmail.debug");
+    }
+    $fh->print(@_);
+}
 
 =pod
 
