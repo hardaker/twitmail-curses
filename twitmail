@@ -860,6 +860,8 @@ sub collect_tweets {
 						       page => $count});
 	if ($new_friend_data) {
 	    push @$friend_data, @$new_friend_data;
+	} else {
+	    last;
 	}
 	$lowid = get_min_id_from_array($friend_data);
 	DEBUG(" lowest id collected in page $count: $lowid");
