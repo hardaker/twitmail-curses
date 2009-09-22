@@ -465,13 +465,15 @@ sub submit_twit {
 
     my $len = length($text);
     if ($len > 140) {
-	# xxx!!!
+	$cui->error("Tweet is too long!  Please shorten it to < 140 characters.");
+	return;
     } else {
 	$cui->status("Submitting tweet");
 	my $status = $twit->update({status => $text, @args});
 	$cui->nostatus;
 	if (!defined($status)) {
 	    $cui->error("Submitting tweet failed");
+	    return;
 	}
     }
     $inreplyto = '';
