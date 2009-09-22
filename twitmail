@@ -225,16 +225,27 @@ sub format_message {
 #   (foiled again)
 #
 
-my $tl;
 my $count = 0;
 my $tweets;
+my %tweets;
+my $subjectListBox;
+my %subjects;
+my %tweets;
+my $twit;
+
+my %msginfo;
 
 sub show_msg {
-    $tl->text("c:" . ($count++) . " " .  $_[0]->get_active_value());
+    my $num = $_[0]->get_active_value();
+    my $tweet = $tweets{$num}[10];
+    $msginfo{'from'}->text($tweets{$num}[2]);
+    $msginfo{'fromname'}->text($tweets{$num}[3]);
+    $msginfo{'date'}->text($tweets{$num}[6]);
+    $msginfo{'reply'}->text($tweets{$num}[9]);
+    $msginfo{'text'}->text($tweets{$num}[10]);
 }
 
-sub do_curses {
-#    import  Curses::UI;
+sub set_listbox {
     $tweets = get_tweets();
 
     my (@ids, %text);
@@ -244,26 +255,106 @@ sub do_curses {
 	  sprintf("%-12.12s %s", $tweet->[2], $tweet->[$#$tweet-1]);
     }
 
+    $subjectListBox->labels(\%text);
+    $subjectListBox->values(\@ids);
+}
+
+sub do_curses {
+#    import  Curses::UI;
+    my $twitline = 20;
+    my $beyondheaders = 10;
+
     my $cui = new Curses::UI( -color_support => 1 );
 
 
     my $win = $cui->add('win', 'Window',
 			 -border => 1,
 			 -y      => 1, # eventually a menu
-			 -bfg    => 'red');
+			 -bfg    => 'blue');
 
-    my $listb = $win->add("lb", "Listbox",
-			  -values => \@ids,
-			  -labels => \%text,
-			  -onselchange => \&show_msg,
-			  -width => -1,
-			  -height => 15);
-    $listb->focus();
+    $subjectListBox = $win->add("lb", "Listbox",
+				-values => [],
+				-labels => {},
+				-onselchange => \&show_msg,
+				-width => -1,
+				-height => 15);
+    $subjectListBox->focus();
 
-    $tl = $win->add("tl", "Label", -text => "baaar\nbaz", -y => -2, -width => -1);
+    #
+    # From fields
+    #
+    $win->add("fromlabel", "Label",
+	      -text => "From:",
+	      -y => $twitline,
+	      -x => 1, -width => $beyondheaders-1, -height => 1);
+    $msginfo{'from'} = 
+      $win->add("from", "Label",
+		-y => $twitline,
+		-x => $beyondheaders, -width => 14, -height => 1,
+	       );
+
+    $msginfo{'fromname'} = 
+      $win->add("fromname", "Label",
+		-y => $twitline,
+		-x => $beyondheaders + 15, -width => 30, -height => 1,
+	       );
+
+    #
+    # in reply to fields
+    #
+    $win->add("replylabel", "Label",
+	      -text => "Reply:",
+	      -y => $twitline+1,
+	      -x => 1, -width => $beyondheaders-1, -height => 1);
+
+    $msginfo{'reply'} = 
+      $win->add("reply", "Label",
+		-y => $twitline+1,
+		-x => $beyondheaders, -width => 10, -height => 1,
+	       );
+
+    $msginfo{'replyname'} = 
+      $win->add("replyname", "Label",
+		-y => $twitline+1,
+		-x => $beyondheaders + 11, -width => 30, -height => 1,
+	       );
+
+    #
+    # in reply to fields
+    #
+    $win->add("datelabel", "Label",
+	      -text => "Sent:",
+	      -y => $twitline+2,
+	      -x => 1, -width => $beyondheaders-1, -height => 1);
+
+    $msginfo{'date'} = 
+      $win->add("date", "Label",
+		-y => $twitline+2,
+		-x => $beyondheaders, -width => 40, -height => 1,
+	       );
+
+
+    $msginfo{'text'} = $win->add("tl", "TextEditor",
+				 -readonly => 1, -wrapping => 1,
+				 -selectable => 0,
+				 -text => "baaar\nbaz",
+				 -y => $twitline + 4,
+				 -x => 3, -width => 76, -height => 4,
+				);
+
+    $twit = $win->add("twit", "TextEditor",
+		      -wrapping => 1,
+		      -bfg => 'green',
+		      -border => 1,
+		      -text => "",
+		      -y => $twitline+10, -x => 0, -width => 78, -height => 4,
+		     );
 
     #    my $text = $win->add("text1", "TextEditor");
     #    $text->focus();
+
+    # boot stap the list values
+    set_listbox();
 
     $cui->set_binding(sub {exit} , "\cQ");
     $cui->mainloop();
@@ -311,6 +402,9 @@ sub get_tweets {
     }
     $gettweeth->execute();
     my $results = $gettweeth->fetchall_arrayref();
+    foreach my $tweet (@$results) {
+	$tweets{$tweet->[0]} = $tweet;
+    }
     return $results;
 }
 
