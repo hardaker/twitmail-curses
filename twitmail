@@ -487,7 +487,7 @@ sub fetch_parent {
 	$cui->nostatus;
 	return;
     }
-    merge_in_tweets(get_tweets("where id = $parentid")); # XXX: fix to ? syntax
+    merge_in_tweets(get_tweets("where id = ?", "", $parentid));
     set_listbox();
 }
 
@@ -771,15 +771,16 @@ sub mark_tweet_as {
 }
 
 sub get_tweets {
-    my $clause = $_[0];
+    my $clause = shift;
     $clause = "where twitmailstatus = 'N'" if (!defined($clause));
-    my $limiter = $_[1] || "";
+    my $limiter = shift;
+    $limiter || "";
     my $gettweeth;
     DEBUG("getting tweets: clause=$clause, limit=$limiter");
     $gettweeth =
       $dbh->prepare_cached("select * from tweets   $clause
                              order by id desc      $limiter ");
-    $gettweeth->execute();
+    $gettweeth->execute(@_);
     my $results = $gettweeth->fetchall_hashref('id');
 
     # map some common data names
