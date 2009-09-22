@@ -2,6 +2,7 @@
 
 use strict;
 use DBI;
+use Curses;
 use Curses::UI;
 use Net::Twitter;
 use Data::Dumper;
@@ -253,6 +254,7 @@ my %subjects;
 my $twitedit;
 
 my %msginfo;
+my %labels;
 
 sub show_msg {
     my $num = $_[0]->get_active_value();
@@ -262,6 +264,10 @@ sub show_msg {
     $msginfo{'date'}->text($tweet->{'created_at'});
     $msginfo{'reply'}->text($tweet->{'inreplytousername'});
     $msginfo{'text'}->text($tweet->{'tweet'});
+
+    my $text = $labels{$num};
+    $_[0]->add_labels($num => $text) if ($text =~ s/^ N//);
+
     if ($tweet->{'twitmailstatus'} eq 'N') {
 	DEBUG("marking $tweet->{id} as read");
 	mark_tweet_as($tweet, '');
@@ -285,7 +291,12 @@ sub thread_tweets {
     return @returnlist;
 }
 
-sub set_listbox {
+sub check_for_new {
+    collect_tweets();
+    gather_default_tweets(); #XXX just merge in new
+}
+
+sub gather_default_tweets {
     $tweets = get_tweets();
 
     my @keys = keys(%$tweets);
@@ -294,8 +305,11 @@ sub set_listbox {
     if ($#keys == -1) {
 	$tweets = get_tweets("", "limit 20");
     }
+    set_listbox();
+}
 
-    my (@ids, %text);
+sub set_listbox {
+    my (@ids);
 
     my @threaded = thread_tweets($tweets);
     DEBUG(Dumper(\@threaded));
@@ -305,16 +319,9 @@ sub set_listbox {
     DEBUG(Dumper(\@lines));
 
     for (my $num = 0; $num <= $#lines; $num++) {
-	$text{$ids[$num]} = $lines[$num];
+	$labels{$ids[$num]} = $lines[$num];
     }
-#     foreach my $tweet (sort keys(%$tweets)) {
-# 	push @ids, $tweets->{$tweet}{id};
-# 	$text{$tweets->{$tweet}{'id'}} = 
-# 	  sprintf("%-12.12s %s", $tweets->{$tweet}{'fromuser'},
-# 		  $tweets->{$tweet}{'tweet'});
-#     }
-
-    $subjectListBox->labels(\%text);
+    $subjectListBox->labels(\%labels);
     $subjectListBox->values(\@ids);
 }
 
@@ -340,8 +347,12 @@ sub reply_to {
 sub submit_twit {
     my $text = $twitedit->get();
     my @args;
-    @args = (in_reply_to_status_id => $inreplyto)
-      if ($inreplyto && $text =~ /^$starttext/);
+
+    if ($inreplyto && $text =~ /^$starttext/) {
+	@args = (in_reply_to_status_id => $inreplyto);
+	mark_tweet_as($inreplyto, 'R');
+    }
+
     my $len = length($text);
     if ($len > 140) {
 	# xxx!!!
@@ -382,12 +393,13 @@ sub do_curses {
     $subjectListBox = $win->add("lb", "Listbox",
 				-values => [],
 				-labels => {},
-				-vscrollbar => 'right',
+				-vscrollbar => 'left',
 				-onselchange => \&show_msg,
 				-width => -1,
 				-height => 15);
     $subjectListBox->focus();
-    $subjectListBox->set_binding(\&reply_to , "r");
+    $subjectListBox->set_binding(\&reply_to ,      "r");
+    $subjectListBox->set_binding(\&check_for_new , "g");
 
     #
     # From fields
@@ -460,6 +472,8 @@ sub do_curses {
 			  -width => 78, -height => 4,
 			  -onchange => \&update_count,
 		     );
+    $twitedit->set_binding(\&submit_twit , KEY_ENTER);
+
     $twitcount = $win->add("twitcount", "Label",
 			   -y => $twitline+8, -x => 74, -width => 4,
 			   -height => 1);
@@ -469,6 +483,7 @@ sub do_curses {
     #    $text->focus();
 
     # boot stap the list values
+    gather_default_tweets();
     set_listbox();
 
     $cui->set_binding(sub {exit} , "\cQ");
@@ -545,7 +560,6 @@ sub get_tweets {
 }
 
 sub collect_tweets {
-    my $twit = shift;
     init_dbh();
     my $lastid = get_config('last_id');
 
@@ -568,15 +582,6 @@ sub collect_tweets {
     DEBUG("collected: " . ($#alldata+1) . "; new lastid = $lastid");
 
     remember_tweets(@alldata);
-
-#     $twit->replies(\%args), $mode, 'since_id', 'id');
-
-#     if ($mode eq 'friends') {
-# 	print_results($twit->friends_timeline(\%args), $mode, 'since_id', 'id');
-#     }
-
-#     if ($mode eq 'public') {
-# 	print_results($twit->public_timeline(\%args), $mode);
 }
 
 my $paramconfig;
