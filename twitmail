@@ -153,7 +153,8 @@ sub print_each_result {
 }
 
 sub sprint_each_result {
-    my ($data, $mode, $setarg, $setfrom, $indent, $lastday, $lastuser, $nowrap)
+    my ($data, $mode, $setarg, $setfrom, $indent, $lastday, $lastuser,
+	$nowrap, $includestatus, $ids)
       = @_;
     my @results;
 
@@ -176,16 +177,19 @@ sub sprint_each_result {
 	$lastday = $thisday;
 
 	# create the results
-	my $line = sprintf("%2.2d %-9.9s %-10.10s $intext", $msgnum,
+	my $line = sprintf("%-2.2s %-9.9s %-10.10s $intext%s", 
+			   ($includestatus ? $dat->{'twitmailstatus'} : $msgnum),
 			   $dat->{'created_at'},
 			   ($lastuser eq $dat->{'user'}{'screen_name'})
-			   ? "" : $dat->{'user'}{'screen_name'});
-	$line = wrap($line, 
+			   ? "" : $dat->{'user'}{'screen_name'},
+			   $dat->{'text'});
+	$line = wrap("", 
 		     sprintf("%2.2s %-9.9s %-10.10s $intext","", "",""),
-		     $dat->{'text'}) unless($nowrap);
+		     $line) unless($nowrap);
 	$line .= "\n";
 	$lastuser = $dat->{'user'}{'screen_name'};
 	push @results, $line;
+	push @$ids, $dat->{'id'} if ($ids);
 
 	my $formattednum = sprintf("%02.2d", $msgnum);
 
@@ -197,7 +201,8 @@ sub sprint_each_result {
 	if (exists($dat->{'replies'})) {
 	    push @results,
 	      print_each_result($dat->{'replies'}, $mode, $setarg, $setfrom,
-				$indent+1, $lastday, $lastuser, $nowrap);
+				$indent+1, $lastday, $lastuser, $nowrap,
+				$ids);
 	}
 
     }
@@ -245,7 +250,7 @@ my $count = 0;
 my $tweets;
 my $subjectListBox;
 my %subjects;
-my $twit;
+my $twitedit;
 
 my %msginfo;
 
@@ -263,6 +268,23 @@ sub show_msg {
     }
 }
 
+sub thread_tweets {
+    my ($tweets) = @_;
+    my @returnlist;
+
+    foreach my $tweetid (sort keys(%{$tweets})) {
+	my $tweet = $tweets->{$tweetid};
+	if ($tweet->{'in_reply_to_status_id'} &&
+	    exists($tweets->{$tweet->{'in_reply_to_status_id'}})) {
+	    push @{$tweets->{$tweet->{'in_reply_to_status_id'}}{'replies'}},
+	      $tweet;
+	} else {
+	    push @returnlist, $tweet;
+	}
+    }
+    return @returnlist;
+}
+
 sub set_listbox {
     $tweets = get_tweets();
 
@@ -274,20 +296,79 @@ sub set_listbox {
     }
 
     my (@ids, %text);
-    foreach my $tweet (sort keys(%$tweets)) {
-	push @ids, $tweets->{$tweet}{id};
-	$text{$tweets->{$tweet}{'id'}} = 
-	  sprintf("%-12.12s %s", $tweets->{$tweet}{'fromuser'},
-		  $tweets->{$tweet}{'tweet'});
+
+    my @threaded = thread_tweets($tweets);
+    DEBUG(Dumper(\@threaded));
+    my @lines = sprint_each_result(\@threaded, undef, undef, undef, 0,
+				   undef, undef, 1, 1, \@ids);
+
+    DEBUG(Dumper(\@lines));
+
+    for (my $num = 0; $num <= $#lines; $num++) {
+	$text{$ids[$num]} = $lines[$num];
     }
+#     foreach my $tweet (sort keys(%$tweets)) {
+# 	push @ids, $tweets->{$tweet}{id};
+# 	$text{$tweets->{$tweet}{'id'}} = 
+# 	  sprintf("%-12.12s %s", $tweets->{$tweet}{'fromuser'},
+# 		  $tweets->{$tweet}{'tweet'});
+#     }
 
     $subjectListBox->labels(\%text);
     $subjectListBox->values(\@ids);
 }
 
+my $inreplyto;
+my $starttext;
+
+sub set_twit_text {
+    my ($text) = @_;
+    $twitedit->text($text);
+    $twitedit->draw();
+    update_count();
+    $twitedit->focus();
+}
+
+sub reply_to {
+    my ($widget) = @_[0];
+    return if (!$widget);
+    $inreplyto = $widget->get_active_value();;
+    $starttext = '@' . $tweets->{$inreplyto}{'fromuser'} . " ";
+    set_twit_text($starttext);
+}
+
+sub submit_twit {
+    my $text = $twitedit->get();
+    my @args;
+    @args = (in_reply_to_status_id => $inreplyto)
+      if ($inreplyto && $text =~ /^$starttext/);
+    my $len = length($text);
+    if ($len > 140) {
+	# xxx!!!
+    } else {
+	$twit->update({status => $text, @args});
+    }
+    $inreplyto = '';
+    $starttext = '';
+    set_twit_text($starttext);
+    $subjectListBox->focus();
+}
+
+my $twitcount;
+sub update_count {
+    my $count = length($twitedit->get());
+    my $text = $count || "";
+    $twitcount->text($text);
+    if ($count > 140) {
+	$twitcount->reverse(1);
+    } else {
+	$twitcount->reverse(0);
+    }
+}
+
 sub do_curses {
 #    import  Curses::UI;
-    my $twitline = 20;
+    my $twitline = 16;
     my $beyondheaders = 10;
 
     my $cui = new Curses::UI( -color_support => 1 );
@@ -301,10 +382,12 @@ sub do_curses {
     $subjectListBox = $win->add("lb", "Listbox",
 				-values => [],
 				-labels => {},
+				-vscrollbar => 'right',
 				-onselchange => \&show_msg,
 				-width => -1,
 				-height => 15);
     $subjectListBox->focus();
+    $subjectListBox->set_binding(\&reply_to , "r");
 
     #
     # From fields
@@ -362,19 +445,25 @@ sub do_curses {
 
     $msginfo{'text'} = $win->add("tl", "TextEditor",
 				 -readonly => 1, -wrapping => 1,
-				 -selectable => 0,
-				 -text => "baaar\nbaz",
+				 -text => "",
 				 -y => $twitline + 4,
 				 -x => 3, -width => 76, -height => 4,
 				);
+    $msginfo{'text'}->focusable(0);
 
-    $twit = $win->add("twit", "TextEditor",
-		      -wrapping => 1,
-		      -bfg => 'green',
-		      -border => 1,
-		      -text => "",
-		      -y => $twitline+10, -x => 0, -width => 78, -height => 4,
+    $twitedit = $win->add("twit", "TextEditor",
+			  -wrapping => 1,
+			  -bfg => 'green',
+			  -border => 1,
+			  -text => "",
+			  -y => $twitline+9, -x => 0,
+			  -width => 78, -height => 4,
+			  -onchange => \&update_count,
 		     );
+    $twitcount = $win->add("twitcount", "Label",
+			   -y => $twitline+8, -x => 74, -width => 4,
+			   -height => 1);
+    $twitcount->focusable(0);
 
     #    my $text = $win->add("text1", "TextEditor");
     #    $text->focus();
@@ -444,6 +533,14 @@ sub get_tweets {
                              order by id desc      $limiter ");
     $gettweeth->execute();
     my $results = $gettweeth->fetchall_hashref('id');
+
+    # map some common data names
+    foreach my $key (keys(%$results)) {
+	my $tweet = $results->{$key};
+	$tweet->{'user'}{'screen_name'} = $tweet->{'fromname'};
+	$tweet->{'text'} = $tweet->{'tweet'};
+    }
+
     return $results;
 }
 
@@ -466,6 +563,7 @@ sub collect_tweets {
 	$lastid = $tweet->{'id'} if ($tweet->{'id'} > $lastid);
     }
     set_config('last_id', $lastid);
+    set_config('last_poll', time());
 
     DEBUG("collected: " . ($#alldata+1) . "; new lastid = $lastid");
 
@@ -519,7 +617,7 @@ sub init_dbh {
 
     # check the DB version
     my $ver = get_config('dbversion');
-    print "DATABASE VERSION: $ver\n";
+    DEBUG("DATABASE VERSION: $ver");
     return if ($ver eq $DBVERSION);
     setup_database();
 }
