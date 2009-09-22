@@ -3,3 +3,4 @@ Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 twitmail
+NEWS.org

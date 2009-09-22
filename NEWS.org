@@ -1,0 +1,14 @@
+TwitMail Release News
+
+* 0.2
+  - Indent replies so they look like
+
+: 22     20:37 trey_brown licensed several more hams tonight at the National 
+:                        Severe Weather Workshop                            
+: 23     22:41 hardaker       @trey_brown More HAMs = good!. I just submitted
+:                            my VE paperwork...                             
+: 24     22:26 trey_brown         @hardaker awesome                          
+
+* 0.1
+  - First Release
+
