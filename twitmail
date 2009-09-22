@@ -367,6 +367,15 @@ sub reply_to {
     set_twit_text($starttext);
 }
 
+sub retweet {
+    my ($widget) = @_[0];
+    return if (!$widget);
+    $inreplyto = $widget->get_active_value();;
+    $starttext = 'RT @' . $tweets->{$inreplyto}{'fromuser'} . " " .
+      $tweets->{$inreplyto}{'tweet'};
+    set_twit_text($starttext);
+}
+
 sub submit_twit {
     my $text = $twitedit->get();
     my @args;
@@ -427,6 +436,7 @@ sub do_curses {
 				-height => 15);
     $subjectListBox->focus();
     $subjectListBox->set_binding(\&reply_to ,      "r");
+    $subjectListBox->set_binding(\&retweet  ,      "f");
     $subjectListBox->set_binding(\&check_for_new , "g");
 
     #
