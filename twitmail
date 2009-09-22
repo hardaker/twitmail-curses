@@ -40,12 +40,11 @@ my %opts = (m => 'friends,replies',
 	    I => 4);
 
 GetOptions(\%opts,
+	   ["l|list",     "List new tweets"],
 	   ["a|show-all", "Show all messages, not just recent"],
 	   ["m|modes=s",  "Comma separated modes to use: friends,replies"],
 	   ["u|update",   "Set your status from arguments"],
 	   ["r|reply=i",  "Reply to message number INTEGER with text from arguments"],
-	   ["c|curses",   "Display curses interface"],
-	   ["C|collect-db", "just collect data"],
 	   ["f|follow=s", "Follow the user named STRING"],
 	   ["S|no-save",  "Don't save the config file back"],
 	   ["I|indent-depth", "Amount of spaces to use when indenting"],
@@ -92,13 +91,8 @@ if ($opts{'f'}) {
     $twit->create_friend({id => $opts{'f'}, follow => '1'});
 }
 
-if ($opts{'c'}) {
+if (!$opts{'c'}) {
     do_curses();
-    exit;
-}
-
-if ($opts{'C'}) {
-    collect_tweets($twit);
     exit;
 }
 
