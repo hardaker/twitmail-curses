@@ -549,7 +549,7 @@ sub search_text {
 sub do_curses {
 #    import  Curses::UI;
     my ($cols, $lines) = GetTerminalSize();
-    my $twitline = ($lines || 24) - 16;
+    my $twitline = ($lines || 24) - 19;
     my $beyondheaders = 10;
 
     $cui = new Curses::UI( -color_support => 1 );
