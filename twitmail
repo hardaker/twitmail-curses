@@ -11,7 +11,7 @@ use Getopt::GUI::Long;
 use strict;
 use Date::Parse;
 
-our $VERSION = "0.3";
+our $VERSION = "0.4";
 our $dbh;
 our $DEBUG = 0;
 
