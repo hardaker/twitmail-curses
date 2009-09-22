@@ -1,0 +1,174 @@
+#!/usr/bin/perl
+
+use Net::Twitter;
+use Data::Dumper;
+use Text::Wrap;
+use Getopt::GUI::Long;
+use strict;
+use Date::Parse;
+
+our $VERSION = "0.1";
+
+Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
+
+my %opts = (m => 'replies,friends');
+
+GetOptions(\%opts,
+	   ["a|show-all", "Show all messages, not just recent"],
+	   ["m|modes=s",  "Comma separated modes to use: replies,friends"],
+	   ["u|update",   "Set your status from arguments"],
+	   ["r|reply=i",  "Reply to message number INTEGER with text from arguments"],
+	   ["f|follow=s", "Follow the user named STRING"],
+	   ["S|no-save",  "Don't save the config file back"],
+	   ["n|count=i",  "Number of messages to return (max)"],
+	   ["d|dump",     "Dumper the results instead of nicely printing"],
+	  );
+
+my %config;
+
+read_config();
+
+my $twit = Net::Twitter->new(username => $config{'user'},
+			     password => $config{'password'},
+			     source => 'twitmail');
+
+#$twit->credentials($config{'user'}, $config{'password'});
+
+# set our update status
+if ($opts{'u'}) {
+    $twit->update({status => format_message()});
+}
+
+# reply
+if ($opts{'r'}) {
+    $opts{'r'} = sprintf("%02.2d", $opts{'r'});
+    if (!exists($config{'msgnum' . $opts{'r'}})) {
+	die "No such message number: $opts{'r'}\n";
+    }
+    $twit->update({status =>
+		   format_message('@' . $config{'usernum' . $opts{'r'}}),
+		   in_reply_to_status_id => $config{'msgnum' . $opts{'r'}}});
+    exit;
+}
+
+# add a friend if needed
+if ($opts{'f'}) {
+    $twit->create_friend({id => $opts{'f'}, follow => '1'});
+}
+
+# display mail
+my @modes = split(/\s*,\s*/,$opts{'m'});
+
+my $msgnum = 0;
+
+foreach my $mode (@modes) {
+
+    my %args;
+    if (!$opts{'a'} && defined($config{$mode . '_since_id'})) {
+	$args{'since_id'} = $config{$mode . '_since_id'};
+    }
+
+    if ($opts{'n'}) {
+	$args{'count'} = $opts{'n'};
+    }
+
+    if ($mode eq 'replies') {
+	print_results($twit->replies(\%args), $mode, 'since_id', 'id');
+    }
+
+    if ($mode eq 'friends') {
+	print_results($twit->friends_timeline(\%args), $mode, 'since_id', 'id');
+    }
+
+    if ($mode eq 'public') {
+	print_results($twit->public_timeline(\%args), $mode);
+    }
+}
+
+save_config();
+
+sub print_results {
+    my ($data, $mode, $setarg, $setfrom) = @_;
+
+    if ($opts{'d'}) {
+	print Dumper($_[0]);
+	return;
+    }
+
+    if ($twit->http_message() ne 'OK') {
+	print "ERROR!\n";
+	print "  ", $twit->http_code(),"\n";
+	print "  ", $twit->http_message(),"\n";
+	print "  ", $twit->get_error()->{'error'},"\n";
+	exit(1);
+    }
+
+    return if ($#$data == -1);
+
+    print "---- $mode ------------------------------------------------------------\n";
+
+    my $lastday = "";
+    my $lastuser = "";
+    foreach my $dat (reverse @$data) {
+
+	$msgnum++;
+
+	# set the time stamp from zulu time to localtime
+	$dat->{'created_at'} = localtime(str2time($dat->{'created_at'}));
+
+	# truncate for prettiness
+	$dat->{'created_at'} =~ s/^(...)......./$1/; # only use day of week
+	my $thisday = $1;
+	$dat->{'created_at'} =~ s/:\d\d//;           # drop seconds
+	$dat->{'created_at'} =~ s/^$lastday/   / if ($lastday);
+	$lastday = $thisday;
+
+	# print the results
+	print wrap(sprintf("%2.2d %-9.9s %-10.10s ", $msgnum,
+			   $dat->{'created_at'},
+			   ($lastuser eq $dat->{'user'}{'screen_name'})
+			   ? "" : $dat->{'user'}{'screen_name'}),
+		   sprintf("%2.2s %-9.9s %-10.10s ","", "",""),
+		   $dat->{'text'}),"\n";
+	$lastuser = $dat->{'user'}{'screen_name'};
+
+	my $formattednum = sprintf("%02.2d", $msgnum);
+
+	$config{'msgnum' . $formattednum} = 
+	  $dat->{'id'} if (exists($dat->{'id'}));
+	$config{'usernum' . $formattednum} =
+	  $dat->{'user'}{'screen_name'} if (exists($dat->{'user'}));
+    }
+
+#    print "  ", Dumper($twit->get_error()),"\n";
+
+    # XXX: only if error
+    if (defined($mode) && defined($setarg)) {
+	$config{"${mode}_${setarg}"} = $data->[0]{$setfrom || $setarg};
+    }
+}
+
+sub read_config {
+    open(I, $ENV{'HOME'} . "/.twitmailrc");
+    while (<I>) {
+	my @data = /^([^\s]+)\s+(.*)/;
+	$config{$data[0]} = $data[1];
+    }
+}
+
+sub save_config {
+    return if ($opts{'S'});
+    open(O, ">" . $ENV{'HOME'} . "/.twitmailrc");
+    foreach my $key (sort keys(%config)) {
+	print O "$key\t$config{$key}\n";
+    }
+}
+
+sub format_message {
+    my $output;
+    $output .= join(" ",@_, @ARGV);
+    if (length($output) > 140) {
+	die "message too long (" . length($output) . " > 140); sorry\n";
+    }
+    return $output;
+}
