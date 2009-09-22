@@ -172,3 +172,141 @@ sub format_message {
     }
     return $output;
 }
+
+=pod
+
+=head1 NAME
+
+twitmail - Because some tweets you just can't afford to miss
+
+=head1 SYNOPSIS
+
+Read new twits:
+
+  # twitmail
+  ---- friends ---------------------------------------------------------
+  01 Tue 18:33 airsax     woohoo finally my DSP board plays nice with my
+                          macbook!!!  i've spent on and off the last 3
+                          or 4 weeks working on this!
+  02     18:38 canusis    how does it always get to be 7pm, and I haven't
+                          even gotten started on any work yet?
+                          tomorrow won't be any better, meetings from
+                          11-5.
+  03     19:10 andrewsf   After 4 crashes in 5 minutes, I'm wondering if
+                          paper would be a more productive
+                          alterrnative to Microsoft Word.
+
+Update your status:
+
+  # twitmail -u is writing documentation for twitmail
+
+Reply to an existing post (#3 ... @NAME is auto-added):
+
+  # twitmail -r 3 Maybe you should write your paper in tweets
+
+Check for new updates (note how replies to me (@hardaker) are singled out):
+
+  # twitmail
+  ---- replies ------------------------------------------------------
+  01 Tue 20:13 jasonsalas @hardaker here's that @metajack post about
+                          bot design...good stuff!    http://is.gd/bzDV
+  ---- friends ------------------------------------------------------
+  02 Tue 20:24 hardaker   @andrewsf Maybe you should write your paper
+                          in tweets
+
+
+=head1 DESCRIPTION
+
+B<twitmail> was designed as a command-line client to keep track of
+tweets that have occured.  Yes, I have fancy graphical clients to do
+that too.  But, most of them don't easily show replies to my previous
+mesasges without scrolling back a ways.  Especially when I've been
+gone for 3 days.  So, twitmail was designed to accomodate that need
+and just print a quick summary of tweets that have arrived.
+
+By default, running twitmail without arguments checks for both replies
+and friend updates.
+
+=head1 CONFIGURATION
+
+You need to put the following two lines in a ~/.twitmailrc file:
+
+  user     TWITER-USER-NAME
+  password TWITTER-PASSWORD
+
+=head1 OPTIONS
+
+=over
+
+=item -a
+
+Shows all messages, not just the most recent.
+
+=item -m MODES
+
+B<MODES> is a comma separated list of things to show:
+
+=over
+
+=item replies
+
+Replies sent to you
+
+=item friends
+
+Updates from friends
+
+=item public
+
+Show updates from all the world.
+
+=back
+
+The default value is replies,friends
+
+=item -u MESSAGE
+
+Updates your twitter status to B<MESSAGE>
+
+=item -r NUM MESSAGE
+
+Replies to a particular message B<NUM>.  A I<@user> prefix will automatically
+be added so all you need is the message number (the left most column
+in the output).
+
+=item -f USER
+
+Follows a particular B<USER>.  Doesn't seem to work yet.
+
+=item -S
+
+Tells twitmail not to save the configuration again.  In particular,
+this means that it will not remember you've just read the messages
+you've read and you'll see them again next time.
+
+=item -n COUNT
+
+Only displays B<COUNT> messages.
+
+(has an issue with some modes)
+
+=back
+
+=head1 TODO
+
+Things on the todo list:
+
+=over
+
+=item -
+
+Make replies indented and next to other messages
+
+=item -
+
+Detect that not enough messages could be retrieved and realize you skipped some.
+
+=back
+
+=cut
+
