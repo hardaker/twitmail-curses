@@ -144,6 +144,11 @@ sub print_results {
 }
 
 sub print_each_result {
+    my @lines = sprint_each_result(@_);
+    print @lines;
+}
+
+sub sprint_each_result {
     my ($data, $mode, $setarg, $setfrom, $indent, $lastday, $lastuser) = @_;
 
     $indent ||= 0;
@@ -227,32 +232,31 @@ sub format_message {
 
 my $count = 0;
 my $tweets;
-my %tweets;
 my $subjectListBox;
 my %subjects;
-my %tweets;
 my $twit;
 
 my %msginfo;
 
 sub show_msg {
     my $num = $_[0]->get_active_value();
-    my $tweet = $tweets{$num}[10];
-    $msginfo{'from'}->text($tweets{$num}[2]);
-    $msginfo{'fromname'}->text($tweets{$num}[3]);
-    $msginfo{'date'}->text($tweets{$num}[6]);
-    $msginfo{'reply'}->text($tweets{$num}[9]);
-    $msginfo{'text'}->text($tweets{$num}[10]);
+    my $tweet = $tweets->{$num};
+    $msginfo{'from'}->text($tweet->{'fromuser'});
+    $msginfo{'fromname'}->text($tweet->{'fromname'});
+    $msginfo{'date'}->text($tweet->{'created_at'});
+    $msginfo{'reply'}->text($tweet->{'inreplytousername'});
+    $msginfo{'text'}->text($tweet->{'tweet'});
 }
 
 sub set_listbox {
     $tweets = get_tweets();
 
     my (@ids, %text);
-    foreach my $tweet (@$tweets) {
-	push @ids, $tweet->[0];
-	$text{$tweet->[0]} = 
-	  sprintf("%-12.12s %s", $tweet->[2], $tweet->[$#$tweet-1]);
+    foreach my $tweet (sort keys(%$tweets)) {
+	push @ids, $tweets->{$tweet}{id};
+	$text{$tweets->{$tweet}{'id'}} = 
+	  sprintf("%-12.12s %s", $tweets->{$tweet}{'fromuser'},
+		  $tweets->{$tweet}{'tweet'});
     }
 
     $subjectListBox->labels(\%text);
@@ -401,10 +405,7 @@ sub get_tweets {
 	  $dbh->prepare_cached("select * from tweets $_[0] order by id desc $_[1]");
     }
     $gettweeth->execute();
-    my $results = $gettweeth->fetchall_arrayref();
-    foreach my $tweet (@$results) {
-	$tweets{$tweet->[0]} = $tweet;
-    }
+    my $results = $gettweeth->fetchall_hashref('id');
     return $results;
 }
 
