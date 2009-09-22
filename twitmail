@@ -4,6 +4,7 @@ use strict;
 use DBI;
 use Curses;
 use Curses::UI;
+use Term::ReadKey;
 use Net::Twitter;
 use Data::Dumper;
 use Text::Wrap;
@@ -547,7 +548,8 @@ sub search_text {
 
 sub do_curses {
 #    import  Curses::UI;
-    my $twitline = 16;
+    my ($cols, $lines) = GetTerminalSize();
+    my $twitline = ($lines || 24) - 16;
     my $beyondheaders = 10;
 
     $cui = new Curses::UI( -color_support => 1 );
@@ -565,7 +567,7 @@ sub do_curses {
 				-vscrollbar => 'left',
 				-onselchange => \&show_msg,
 				-width => -1,
-				-height => 15);
+				-height => $twitline);
     $subjectListBox->focus();
     $subjectListBox->set_binding(\&reply_to ,      "r");
     $subjectListBox->set_binding(\&fetch_parent ,  "^");
