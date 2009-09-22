@@ -33,7 +33,6 @@ my @helptexts =
   (" (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (>) more help",
    " (^) Show Parent |  (p)references | (>) more help ");
 my $helpnum = -1;
-my $helpbar;
 
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
 
@@ -274,7 +273,7 @@ sub format_message {
 }
 
 ##############################################################################
-# CURSES
+# CURSES VARIABLES
 #   (foiled again)
 #
 
@@ -291,6 +290,8 @@ my $statusbar;
 
 my $mainwin;
 my $prefwin;
+my $helpbar;
+my $statusbar;
 
 sub show_msg {
     my $num = $_[0]->get_active_value();
@@ -393,6 +394,7 @@ sub set_listbox {
     }
     $subjectListBox->labels(\%labels);
     $subjectListBox->values(\@ids);
+    set_status("Showing $#ids tweets");
     return \@ids;
 }
 
@@ -405,6 +407,13 @@ sub set_twit_text {
     $twitedit->draw();
     update_count();
     $twitedit->focus();
+}
+
+sub set_status{
+    my $text = " Status: " . join(" ",@_);
+    DEBUG("setting status: $text");
+    $text .= " " x (78-length($text));
+    $statusbar->text($text);
 }
 
 ######################################################################
@@ -549,8 +558,11 @@ sub do_curses {
     # From fields
     #
     $win->add("fromlabel", "Label",
-	      -text => "From:",
+	      -text => "From: ",
 	      -y => $twitline,
+	      -bg => 'yellow',
+	      -bfg => 'yellow',
+	      -fg => 'black',
 	      -x => 1, -width => $beyondheaders-1, -height => 1);
     $msginfo{'from'} = 
       $win->add("from", "Label",
@@ -569,6 +581,9 @@ sub do_curses {
     #
     $win->add("replylabel", "Label",
 	      -text => "Reply:",
+	      -bg => 'yellow',
+	      -bfg => 'yellow',
+	      -fg => 'black',
 	      -y => $twitline+1,
 	      -x => 1, -width => $beyondheaders-1, -height => 1);
 
@@ -588,7 +603,10 @@ sub do_curses {
     # in reply to fields
     #
     $win->add("datelabel", "Label",
-	      -text => "Sent:",
+	      -text => "Sent: ",
+	      -bg => 'yellow',
+	      -bfg => 'yellow',
+	      -fg => 'black',
 	      -y => $twitline+2,
 	      -x => 1, -width => $beyondheaders-1, -height => 1);
 
@@ -627,17 +645,30 @@ sub do_curses {
     $twitcount->focusable(0);
 
     #
-    # status bar
+    # help bar
     #
     $helpbar = $win->add("help", "Label",
 			 -text => "",
-			 -bg => 'blue',
 			 -y => -1,
 			 -x => 0,
+			 -bg => 'blue',
 			 -bfg => 'blue',
 			 -fg => 'black',
 			 -width => 78, -height => 1);
     rotate_help();
+
+    #
+    # status bar
+    #
+    $statusbar = $win->add("status", "Label",
+			   -text => "",
+			   -y => -2,
+			   -x => 0,
+			   -bg => 'blue',
+			   -bfg => 'blue',
+			   -fg => 'black',
+			   -width => 78, -height => 1);
+    set_status("initializing...");
 
     #    my $text = $win->add("text1", "TextEditor");
     #    $text->focus();
