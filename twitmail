@@ -29,6 +29,12 @@ my %prefdefaults =
   (fetchunread => 100,
   );
 
+my @helptexts =
+  (" (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (>) more help",
+   " (^) Show Parent |  (p)references | (>) more help ");
+my $helpnum = -1;
+my $helpbar;
+
 Getopt::GUI::Long::Configure(qw(display_help no_ignore_case allow_zero));
 
 my %opts = (m => 'friends,replies',
@@ -282,7 +288,6 @@ my %msginfo;
 my %labels;
 my $cui;
 my $statusbar;
-my $helpbar;
 
 my $mainwin;
 my $prefwin;
@@ -372,21 +377,6 @@ sub gather_default_tweets {
     }
 }
 
-sub fetch_parent {
-    my ($widget) = @_[0];
-    # merge in the last unread
-    my $currentid = $widget->get_active_value();;
-    my $parentid  = $tweets->{$currentid}{'inreplytoid'};
-    if (!$parentid) {
-	$cui->status("This tweet is not a reply and doesn't have a parent tweet");
-	sleep(2);
-	$cui->nostatus;
-	return;
-    }
-    merge_in_tweets(get_tweets("where id = $parentid")); # XXX: fix to ? syntax
-    set_listbox();
-}
-
 sub set_listbox {
     my (@ids);
 
@@ -416,6 +406,10 @@ sub set_twit_text {
     update_count();
     $twitedit->focus();
 }
+
+######################################################################
+# COMMANDS
+#
 
 sub reply_to {
     my ($widget) = @_[0];
@@ -473,6 +467,21 @@ sub submit_twit {
     $subjectListBox->focus();
 }
 
+sub fetch_parent {
+    my ($widget) = @_[0];
+    # merge in the last unread
+    my $currentid = $widget->get_active_value();;
+    my $parentid  = $tweets->{$currentid}{'inreplytoid'};
+    if (!$parentid) {
+	$cui->status("This tweet is not a reply and doesn't have a parent tweet");
+	sleep(2);
+	$cui->nostatus;
+	return;
+    }
+    merge_in_tweets(get_tweets("where id = $parentid")); # XXX: fix to ? syntax
+    set_listbox();
+}
+
 my $twitcount;
 sub update_count {
     my $count = length($twitedit->get());
@@ -490,6 +499,20 @@ sub save_prefs {
 	set_config($pref, $prefwidgets{$pref}->get());
     }
 }
+
+sub rotate_help {
+    $helpnum++;
+    $helpnum = 0 if ($helpnum > $#helptexts);
+    my $help = $helptexts[$helpnum];
+    $help .= " " x (78-length($help));
+    DEBUG("setting help to #$helpnum '$help'");
+    $helpbar->text($help);
+    $helpbar->draw();
+}
+
+######################################################################
+# CURSES SETUP
+#
 
 sub do_curses {
 #    import  Curses::UI;
@@ -518,6 +541,7 @@ sub do_curses {
     $subjectListBox->set_binding(\&retweet  ,      "f");
     $subjectListBox->set_binding(\&openurl  ,      "o");
     $subjectListBox->set_binding(\&check_for_new , "g");
+    $subjectListBox->set_binding(\&rotate_help ,   ">");
     $subjectListBox->set_binding(sub {$prefwin->focus();} , "p");
     $subjectListBox->set_binding(sub {exit} , "q");
 
@@ -605,16 +629,15 @@ sub do_curses {
     #
     # status bar
     #
-    my $help = " (g)et new tweets | (r)eply | (f)orward/retweet | (o)pen URL | (q)uit";
-    $help .= " " x (78-length($help));
     $helpbar = $win->add("help", "Label",
-			 -text => $help,
+			 -text => "",
 			 -bg => 'blue',
 			 -y => -1,
 			 -x => 0,
 			 -bfg => 'blue',
 			 -fg => 'black',
 			 -width => 78, -height => 1);
+    rotate_help();
 
     #    my $text = $win->add("text1", "TextEditor");
     #    $text->focus();
