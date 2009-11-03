@@ -916,7 +916,6 @@ sub get_min_id_from_array {
 my $paramconfig;
 sub get_config {
     my ($name, $default) = @_;
-    # check the DB version
     if (!$paramconfig) {
 	$paramconfig = $dbh->prepare_cached("select value from twitmail where name = ?");
     }
@@ -931,17 +930,40 @@ sub get_config {
     return $default;
 }
 
+# returns all entries
+my $param_config_list;
+sub get_config_list {
+    my ($name) = @_;
+    if (!$param_config_list) {
+	$param_config_list = $dbh->prepare_cached("select value from twitmail where name = ?");
+    }
+    my ($results, @results);
+    if ($param_config_list) {
+	$param_config_list->execute($name);
+	$results = $param_config_list->fetchall_arrayref();
+	map { push @results, $_ } @$results;
+	$param_config_list->finish(); # required to work around a bug.
+    }
+    return \@results;
+}
+
 my $setparamconfig;
 my $delparamconfig;
-sub set_config {
-    my ($name, $value) = @_;
-    # check the DB version
+sub set_config_list {
+    my ($name, $values) = @_;
     if (!$setparamconfig) {
 	$setparamconfig = $dbh->prepare_cached("insert into twitmail(name, value) values(?, ?)");
 	$delparamconfig = $dbh->prepare_cached("delete from twitmail where name = ?");
     }
     $delparamconfig->execute($name);
-    $setparamconfig->execute($name, $value);
+    foreach my $value (@$values) {
+	$setparamconfig->execute($name, $value);
+    }
+}
+
+sub set_config {
+    my ($name, $value) = @_;
+    set_config_list($name, [$value]);
 }
 
 sub init_dbh {
