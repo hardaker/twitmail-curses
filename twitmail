@@ -27,6 +27,8 @@ my @preferences =
     max_tweets   => 'Maximum number of new tweets to fetch',
     undef,
     do_debugging => 'Log debugging to ~/.twitmail.debug',
+    undef,
+    ignore_list  => ['list', 'Regexp of tweets to ignore'],
   );
 
 my %prefdefaults =
@@ -511,7 +513,16 @@ sub update_count {
 
 sub save_prefs {
     foreach my $pref (keys(%prefwidgets)) {
-	set_config($pref, $prefwidgets{$pref}->get());
+	DEBUG("saving: " . ref($prefwidgets{$pref}) . "\n");
+	if (ref($prefwidgets{$pref}) eq 'Curses::UI::TextEntry') {
+	    set_config($pref, $prefwidgets{$pref}->get());
+	} elsif (ref($prefwidgets{$pref}) eq 'Curses::UI::TextEditor') {
+	    my $values = $prefwidgets{$pref}->get();
+	    my @values = split(/\n/,$values);
+	    set_config_list($pref, \@values);
+	} else {
+	    die "unknown pref type: " . ref($prefwidgets{$pref}) . "\n";
+	}
     }
 }
 
@@ -732,16 +743,42 @@ sub do_curses {
 	$prefcount++;
 	DEBUG("pref: " . $preferences[$i]);
 	if (defined($preferences[$i])) {
-	    DEBUG("pref text: " . $preferences[$i+1]);
+	    my $preftext = $preferences[$i+1];
+	    my $preftype = 'entry';
+	    if (ref($preftext) eq 'ARRAY') {
+		($preftype, $preftext) = @$preftext;
+		DEBUG("ugh: ", Dumper($preftext));
+		DEBUG("and: $preftype, $preftext");
+	    }
+	    DEBUG("and: $preftype, $preftext");
 	    $prefwin->add($preferences[$i] . 'lab', "Label",
 			  -x => 1, -y => $prefcount,
-			  -text => $preferences[$i+1] . ":");
-	    $prefwidgets{$preferences[$i]} =
-	      $prefwin->add($preferences[$i] . 'wid', "TextEntry",
-			    -x => 40, -y => $prefcount, -width => 20,
-			    -text => (get_config($preferences[$i]) ||
-				      $prefdefaults{$preferences[$i]} || ""),
-			    -underline => 1);
+			  -text => $preftext . ":");
+	    if ($preftype eq 'entry') {
+		DEBUG("   is entry: $preferences[$i]\n");
+		$prefwidgets{$preferences[$i]} =
+		  $prefwin->add($preferences[$i] . 'wid', "TextEntry",
+				-x => 40, -y => $prefcount, -width => 20,
+				-text =>
+				(get_config($preferences[$i]) ||
+				 $prefdefaults{$preferences[$i]} || ""),
+				-underline => 1);
+	    } elsif ($preftype eq 'list') {
+		DEBUG("   is list: $preferences[$i]\n");
+		my $values = get_config_list($preferences[$i]);
+		DEBUG("values: ", Dumper($values));
+		my $value = join("\n",@$values);
+		$prefwidgets{$preferences[$i]} =
+		  $prefwin->add($preferences[$i] . 'wid', "TextEditor",
+				-x => 40,
+				-y => $prefcount,
+				-width => 20,
+				-wrapping => 0,
+				-text => $value,
+				-height => 4,
+			       );
+		$prefcount += 3;
+	    }
 	    $i++;
 	}
     }
@@ -941,7 +978,7 @@ sub get_config_list {
     if ($param_config_list) {
 	$param_config_list->execute($name);
 	$results = $param_config_list->fetchall_arrayref();
-	map { push @results, $_ } @$results;
+	map { push @results, $_->[0] } @$results;
 	$param_config_list->finish(); # required to work around a bug.
     }
     return \@results;
