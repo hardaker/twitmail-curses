@@ -589,6 +589,7 @@ sub do_curses {
     $subjectListBox->set_binding(\&check_for_new , "g");
     $subjectListBox->set_binding(\&rotate_help ,   ">");
     $subjectListBox->set_binding(\&search_text ,   "/");
+    $subjectListBox->set_binding(\&gather_default_tweets,   "z");
     $subjectListBox->set_binding(sub {$prefwin->focus();} , "p");
     $subjectListBox->set_binding(sub {exit} , "q");
 
