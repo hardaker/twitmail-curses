@@ -1008,7 +1008,7 @@ sub init_dbh {
     # set up the DB
     $dbh = DBI->connect("DBI:SQLite:dbname=" . $ENV{'HOME'} . "/.twitmaildb");
     $dbh->{'sqlite_handle_binary_nulls'} = 1;
-    $dbh->{'unicode'} = 1;
+    $dbh->{'sqlite_unicode'} = 1;
 
     # check the DB version
     my $ver = get_config('dbversion');
